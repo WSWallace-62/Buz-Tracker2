@@ -3,7 +3,6 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
-  base: '/Buz-Tracker2/',   // <-- add this
   plugins: [
     react(),
     VitePWA({
