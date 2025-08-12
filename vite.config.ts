@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  base: '/Buz-Tracker2/',   // <-- add this
   plugins: [
     react(),
     VitePWA({
@@ -12,6 +13,10 @@ export default defineConfig({
         cleanupOutdatedCaches: true,
         skipWaiting: true
       },
+    }),
+  ],
+})
+
       includeAssets: ['vite.svg', 'pwa-192x192.png', 'pwa-512x512.png'],
       manifest: {
         name: 'BuzTracker - Time & Expense Tracker',

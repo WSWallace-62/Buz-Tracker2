@@ -3,6 +3,7 @@
   "short_name": "BuzTracker",
   "description": "Local-first time and expense tracking Progressive Web App",
   "start_url": "/",
+  "scope": ".",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#3b82f6",
@@ -27,7 +28,7 @@
     {
       "name": "Start Timer",
       "description": "Quickly start time tracking",
-      "url": "/?action=start",
+      "url": "./?action=start",
       "icons": [
         {
           "src": "pwa-192x192.png",
@@ -39,7 +40,7 @@
     {
       "name": "Add Entry",
       "description": "Manually add time entry",
-      "url": "/?action=add",
+      "url": "./?action=add",
       "icons": [
         {
           "src": "pwa-192x192.png",
