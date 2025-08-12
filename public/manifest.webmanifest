@@ -3,7 +3,7 @@
   "short_name": "BuzTracker",
   "description": "Local-first time and expense tracking Progressive Web App",
   "start_url": "/",
-  "scope": ".",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#3b82f6",
