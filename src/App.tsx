@@ -12,7 +12,7 @@ import { ProjectManagerModal } from './components/ProjectManagerModal'
 import { HistoryPanel } from './components/HistoryPanel'
 import { ConfirmDialog } from './components/ConfirmDialog'
 import { Toast } from './components/Toast'
-import { ImportExport } from './components/ImportExport'
+import { UserProfile } from './components/UserProfile'
 import { InstallButton } from './pwa/InstallButton'
 import { getTotalDuration, formatDurationHHMM } from './utils/time'
 import './styles.css'
@@ -178,7 +178,7 @@ function AppContent() {
           <Route path="/settings" element={
             <div className="space-y-8">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <ImportExport />
+                <UserProfile />
 
                 <div className="bg-white rounded-lg shadow-md p-6">
                   <h3 className="text-lg font-semibold mb-4">Keyboard Shortcuts</h3>

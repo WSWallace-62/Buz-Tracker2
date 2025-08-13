@@ -16,6 +16,7 @@ import {
   Legend
 } from 'chart.js'
 import { Bar } from 'react-chartjs-2'
+import Papa from 'papaparse'
 
 ChartJS.register(
   CategoryScale,
@@ -249,6 +250,94 @@ export function HistoryPanel() {
     showToast('Sessions exported to CSV', 'success')
   }
 
+  const importCSV = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) {
+      showToast('No file selected', 'error')
+      return
+    }
+
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: async (results) => {
+        const requiredHeaders = ['Date', 'Start', 'Stop', 'Project']
+        const headers = results.meta.fields || []
+        const missingHeaders = requiredHeaders.filter(h => !headers.includes(h))
+
+        if (missingHeaders.length > 0) {
+          showToast(`Missing required columns: ${missingHeaders.join(', ')}`, 'error')
+          return
+        }
+
+        const importedSessions: any[] = results.data.map((row: any) => {
+          const date = row['Date']
+          const startStr = row['Start']
+          const stopStr = row['Stop']
+
+          if (!date || !startStr || !stopStr) return null
+
+          const start = new Date(`${date} ${startStr}`).getTime()
+          const stop = new Date(`${date} ${stopStr}`).getTime()
+          const durationMs = stop - start
+
+          if (isNaN(start) || isNaN(stop) || durationMs < 0) return null
+
+          return {
+            // Find project by name, or create a new one
+            projectName: row['Project'],
+            start,
+            stop,
+            durationMs,
+            note: row['Note'] || '',
+          }
+        }).filter(Boolean)
+
+        if (importedSessions.length === 0) {
+          showToast('No valid sessions found in CSV', 'info')
+          return
+        }
+
+        try {
+          await db.transaction('rw', db.projects, db.sessions, async () => {
+            for (const session of importedSessions) {
+              const project = projects.find(p => p.name === session.projectName)
+              let projectId
+              if (!project) {
+                // Create new project with a random color
+                const newProject = {
+                  name: session.projectName,
+                  color: `#${Math.floor(Math.random()*16777215).toString(16)}`,
+                  archived: false,
+                  createdAt: Date.now()
+                }
+                projectId = await db.projects.add(newProject)
+              } else {
+                projectId = project.id
+              }
+
+              await db.sessions.add({
+                projectId: projectId as number,
+                start: session.start,
+                stop: session.stop,
+                durationMs: session.durationMs,
+                note: session.note,
+                createdAt: Date.now()
+              })
+            }
+          })
+          showToast(`Successfully imported ${importedSessions.length} sessions.`, 'success')
+        } catch(error) {
+          console.error("Failed to import sessions", error)
+          showToast('Failed to import sessions', 'error')
+        }
+      },
+      error: (error) => {
+        showToast(`CSV parsing error: ${error.message}`, 'error')
+      }
+    })
+  }
+
   const getDynamicTitle = () => {
     switch (dateFilter) {
       case 'today': return "Today's Sessions"
@@ -412,7 +501,16 @@ export function HistoryPanel() {
           >
             Export CSV
           </button>
-          
+
+          <label className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors text-sm cursor-pointer">
+            Import CSV
+            <input
+              type="file"
+              className="hidden"
+              accept=".csv"
+              onChange={importCSV}
+            />
+          </label>
         </div>
       </div>
 
@@ -433,6 +531,9 @@ export function HistoryPanel() {
         </div>
       </div>
 
+      {/* Sessions Table */}
+      <SessionsTable sessions={filteredSessions} showAllProjects={true} title={getDynamicTitle()} />
+
       {/* Chart */}
       {showChart && chartData.datasets[0].data.some(val => val > 0) && (
         <div className="bg-white rounded-lg shadow-md p-6">
@@ -441,9 +542,6 @@ export function HistoryPanel() {
           </div>
         </div>
       )}
-
-      {/* Sessions Table */}
-      <SessionsTable sessions={filteredSessions} showAllProjects={true} title={getDynamicTitle()} />
     </div>
   )
 }
