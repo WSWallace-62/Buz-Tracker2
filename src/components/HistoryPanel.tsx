@@ -309,6 +309,7 @@ export function HistoryPanel() {
                   name: session.projectName,
                   color: `#${Math.floor(Math.random()*16777215).toString(16)}`,
                   archived: false,
+                  createdAt: Date.now()
                 }
                 projectId = await db.projects.add(newProject)
               } else {
@@ -316,11 +317,12 @@ export function HistoryPanel() {
               }
 
               await db.sessions.add({
-                projectId: projectId!,
+                projectId: projectId as number,
                 start: session.start,
                 stop: session.stop,
                 durationMs: session.durationMs,
-                note: session.note
+                note: session.note,
+                createdAt: Date.now()
               })
             }
           })
@@ -341,7 +343,7 @@ export function HistoryPanel() {
       case 'today': return "Today's Sessions"
       case 'thisWeek': return "This Week's Sessions"
       case 'lastWeek': return "Last Week's Sessions"
-      case 'thisMonth': "This Month's Sessions"
+      case 'thisMonth': return "This Month's Sessions"
       case 'lastMonth': return "Last Month's Sessions"
       default: return 'Sessions'
     }

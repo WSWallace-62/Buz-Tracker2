@@ -156,28 +156,39 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
 
   stopSession: async () => {
     try {
-      const running = get().runningSession
+      const running = get().runningSession;
       if (!running) {
-        throw new Error('No running session found')
+        throw new Error('No running session found');
       }
-      
-      const now = Date.now()
-      const durationMs = now - running.startTs
-      
-      // Create the completed session
-      await get().createSession({
+  
+      const now = Date.now();
+      const durationMs = now - running.startTs;
+  
+      // Create the completed session object
+      const newSessionData: Omit<Session, 'id'> = {
         projectId: running.projectId,
         start: running.startTs,
         stop: now,
         durationMs,
-        note: running.note
-      })
+        note: running.note,
+        createdAt: now,
+      };
       
-      // Clear running session
-      await db.runningSession.clear()
-      set({ runningSession: null })
+      // Add it to the database
+      const newId = await db.sessions.add(newSessionData);
+      const newSession = { ...newSessionData, id: newId as number };
+  
+      // Clear running session from DB and state
+      await db.runningSession.clear();
+      
+      // Update state with new session and remove running session
+      set(state => ({
+        runningSession: null,
+        sessions: [newSession, ...state.sessions]
+      }));
+  
     } catch (error) {
-      set({ error: (error as Error).message })
+      set({ error: (error as Error).message });
     }
   },
 
