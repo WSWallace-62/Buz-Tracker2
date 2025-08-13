@@ -42,7 +42,7 @@ export class BuzTrackerDB extends Dexie {
   constructor() {
     super('BuzTrackerDB')
     
-    this.version(1).stores({
+    this.version(2).stores({
       projects: '++id, name, createdAt, archived',
       sessions: '++id, projectId, start, stop, createdAt, *note',
       settings: '++id',
