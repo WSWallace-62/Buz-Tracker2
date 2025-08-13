@@ -18,6 +18,7 @@ export function Stopwatch({ projectId }: StopwatchProps) {
   
   const { showConfirm, showToast } = useUIStore()
   const [elapsed, setElapsed] = useState(0)
+  const [note, setNote] = useState('')
   const intervalRef = useRef<NodeJS.Timeout>()
   const stopwatchRef = useRef<HTMLDivElement>(null)
 
@@ -27,6 +28,12 @@ export function Stopwatch({ projectId }: StopwatchProps) {
   useEffect(() => {
     loadRunningSession()
   }, [loadRunningSession])
+
+  useEffect(() => {
+    if (runningSession?.note) {
+      setNote(runningSession.note)
+    }
+  }, [runningSession])
 
   useEffect(() => {
     if (isRunning) {
@@ -76,17 +83,22 @@ export function Stopwatch({ projectId }: StopwatchProps) {
           'A session is already running for another project. Do you want to stop it and start a new session for this project?',
           async () => {
             await stopSession()
-            await startSession(projectId)
+            await startSession(projectId, note)
             showToast('Session started for new project', 'success')
           }
         )
       } else {
-        await startSession(projectId)
+        await startSession(projectId, note)
         showToast('Session started', 'success')
       }
     } catch (error) {
       showToast((error as Error).message, 'error')
     }
+  }
+
+  const handleReset = () => {
+    setElapsed(0)
+    setNote('')
   }
 
   const handleStop = async () => {
@@ -132,6 +144,14 @@ export function Stopwatch({ projectId }: StopwatchProps) {
           {formatDuration(isRunning && isCurrentProject ? elapsed : 0)}
         </div>
         
+        <textarea
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="Add a note for this session..."
+          className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
+          rows={2}
+          disabled={isRunning}
+        />
         <div className="flex justify-center space-x-3">
           <button
             onClick={handleStart}
@@ -161,6 +181,21 @@ export function Stopwatch({ projectId }: StopwatchProps) {
             aria-label="Stop timer"
           >
             Stop
+          </button>
+
+          <button
+            onClick={handleReset}
+            disabled={isRunning}
+            className={`
+              px-6 py-2 rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2
+              ${!isRunning
+                ? 'bg-gray-600 text-white hover:bg-gray-700 focus:ring-gray-500'
+                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              }
+            `}
+            aria-label="Reset timer"
+          >
+            Reset
           </button>
         </div>
 

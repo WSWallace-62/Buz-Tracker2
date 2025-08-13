@@ -30,6 +30,7 @@ export interface RunningSession {
   running: boolean
   projectId: number
   startTs: number
+  note?: string
 }
 
 export class BuzTrackerDB extends Dexie {
@@ -43,7 +44,7 @@ export class BuzTrackerDB extends Dexie {
     
     this.version(1).stores({
       projects: '++id, name, createdAt, archived',
-      sessions: '++id, projectId, start, stop, createdAt',
+      sessions: '++id, projectId, start, stop, createdAt, *note',
       settings: '++id',
       runningSession: '++id'
     })

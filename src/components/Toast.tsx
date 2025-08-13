@@ -32,11 +32,9 @@ interface ToastItemProps {
 
 function ToastItem({ toast, onRemove }: ToastItemProps) {
   useEffect(() => {
-    if (!toast.action) {
-      const timer = setTimeout(onRemove, 5000)
-      return () => clearTimeout(timer)
-    }
-  }, [toast.action, onRemove])
+    const timer = setTimeout(onRemove, 3000)
+    return () => clearTimeout(timer)
+  }, [onRemove])
 
   const getToastStyles = () => {
     switch (toast.type) {
