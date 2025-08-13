@@ -301,7 +301,7 @@ export function HistoryPanel() {
         try {
           await db.transaction('rw', db.projects, db.sessions, async () => {
             for (const session of importedSessions) {
-              let project = projects.find(p => p.name === session.projectName)
+              const project = projects.find(p => p.name === session.projectName)
               let projectId
               if (!project) {
                 // Create new project with a random color
@@ -341,7 +341,7 @@ export function HistoryPanel() {
       case 'today': return "Today's Sessions"
       case 'thisWeek': return "This Week's Sessions"
       case 'lastWeek': return "Last Week's Sessions"
-      case 'thisMonth': return "This Month's Sessions"
+      case 'thisMonth': "This Month's Sessions"
       case 'lastMonth': return "Last Month's Sessions"
       default: return 'Sessions'
     }
