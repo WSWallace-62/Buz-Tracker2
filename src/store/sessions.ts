@@ -20,7 +20,7 @@ interface SessionsState {
   
   // Running session management
   loadRunningSession: () => Promise<void>
-  startSession: (projectId: number) => Promise<void>
+  startSession: (projectId: number, note?: string) => Promise<void>
   stopSession: () => Promise<void>
   getCurrentElapsed: () => number
   
@@ -129,7 +129,7 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
     }
   },
 
-  startSession: async (projectId) => {
+  startSession: async (projectId, note) => {
     try {
       // Check if there's already a running session
       const existing = await db.runningSession.toCollection().first()
@@ -141,7 +141,8 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
       const runningSession: RunningSession = {
         running: true,
         projectId,
-        startTs: now
+        startTs: now,
+        note
       }
       
       await db.runningSession.clear()
@@ -168,7 +169,8 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
         projectId: running.projectId,
         start: running.startTs,
         stop: now,
-        durationMs
+        durationMs,
+        note: running.note
       })
       
       // Clear running session
