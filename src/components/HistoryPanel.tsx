@@ -1,4 +1,6 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useMemo } from 'react'
+import { useLiveQuery } from 'dexie-react-hooks'
+import { db } from '../db/dexie'
 import { useSessionsStore } from '../store/sessions'
 import { useProjectsStore } from '../store/projects'
 import { useUIStore } from '../store/ui'
@@ -28,9 +30,9 @@ type DateFilter = 'today' | 'thisWeek' | 'lastWeek' | 'thisMonth' | 'lastMonth' 
 type GroupBy = 'day' | 'project'
 
 export function HistoryPanel() {
-  const { getSessionsByDateRange, getTotalDuration, loadSessions, clearTodaySessions } = useSessionsStore()
+  const { getTotalDuration } = useSessionsStore()
   const { projects } = useProjectsStore()
-  const { currentProjectId, showConfirm, showToast } = useUIStore()
+  const { showToast } = useUIStore()
   
   const [dateFilter, setDateFilter] = useState<DateFilter>('today')
   const [customStart, setCustomStart] = useState('')
@@ -38,10 +40,8 @@ export function HistoryPanel() {
   const [selectedProjectIds, setSelectedProjectIds] = useState<number[]>([])
   const [groupBy, setGroupBy] = useState<GroupBy>('day')
   const [showChart, setShowChart] = useState(true)
-
-  useEffect(() => {
-    loadSessions()
-  }, [loadSessions])
+  const [sortOrder, setSortOrder] = useState<'date-desc' | 'date-asc' | 'start-desc' | 'start-asc'>('date-desc')
+  const [noteFilter, setNoteFilter] = useState('')
 
   const dateRanges = useMemo(() => getDateRanges(), [])
 
@@ -57,13 +57,44 @@ export function HistoryPanel() {
     return { startDate: range.start, endDate: range.end }
   }, [dateFilter, customStart, customEnd, dateRanges])
 
+  const sessions = useLiveQuery(() => {
+    const query = db.sessions
+      .where('start')
+      .between(startDate, endDate)
+
+    return query.toArray()
+  }, [startDate, endDate])
+
   const filteredSessions = useMemo(() => {
-    return getSessionsByDateRange(
-      startDate,
-      endDate,
-      selectedProjectIds.length > 0 ? selectedProjectIds : undefined
-    )
-  }, [getSessionsByDateRange, startDate, endDate, selectedProjectIds])
+    if (!sessions) return []
+
+    let filtered = sessions;
+
+    if (selectedProjectIds.length > 0) {
+      filtered = filtered.filter(s => selectedProjectIds.includes(s.projectId))
+    }
+
+    if (noteFilter) {
+      filtered = filtered.filter(s => s.note?.toLowerCase().includes(noteFilter.toLowerCase()))
+    }
+
+    const [sortKey, sortDir] = sortOrder.split('-')
+
+    filtered.sort((a, b) => {
+      let valA, valB;
+      if (sortKey === 'date') {
+        valA = new Date(formatDate(a.start)).getTime()
+        valB = new Date(formatDate(b.start)).getTime()
+      } else { // start time
+        valA = a.start
+        valB = b.start
+      }
+
+      return sortDir === 'asc' ? valA - valB : valB - valA
+    })
+
+    return filtered
+  }, [sessions, selectedProjectIds, noteFilter, sortOrder])
 
   const summaryData = useMemo(() => {
     const totalMs = getTotalDuration(filteredSessions)
@@ -182,23 +213,6 @@ export function HistoryPanel() {
     setSelectedProjectIds([])
   }
 
-  const handleClearToday = () => {
-    if (!currentProjectId) {
-      showToast('Please select a project first', 'error')
-      return
-    }
-
-    const projectName = projects.find(p => p.id === currentProjectId)?.name
-    showConfirm(
-      'Clear Today\'s Sessions',
-      `Are you sure you want to delete all of today's sessions for "${projectName}"? This cannot be undone.`,
-      async () => {
-        await clearTodaySessions(currentProjectId)
-        showToast('Today\'s sessions cleared', 'success')
-      }
-    )
-  }
-
   const exportCSV = () => {
     if (filteredSessions.length === 0) {
       showToast('No sessions to export', 'info')
@@ -233,6 +247,17 @@ export function HistoryPanel() {
     URL.revokeObjectURL(url)
 
     showToast('Sessions exported to CSV', 'success')
+  }
+
+  const getDynamicTitle = () => {
+    switch (dateFilter) {
+      case 'today': return "Today's Sessions"
+      case 'thisWeek': return "This Week's Sessions"
+      case 'lastWeek': return "Last Week's Sessions"
+      case 'thisMonth': return "This Month's Sessions"
+      case 'lastMonth': return "Last Month's Sessions"
+      default: return 'Sessions'
+    }
   }
 
   return (
@@ -303,6 +328,36 @@ export function HistoryPanel() {
           </div>
         </div>
 
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Sort By
+            </label>
+            <select
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value as any)}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="date-desc">Date (Newest First)</option>
+              <option value="date-asc">Date (Oldest First)</option>
+              <option value="start-desc">Start Time (Newest First)</option>
+              <option value="start-asc">Start Time (Oldest First)</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Filter by Note
+            </label>
+            <input
+              type="text"
+              value={noteFilter}
+              onChange={(e) => setNoteFilter(e.target.value)}
+              placeholder="Enter note text..."
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+        </div>
+
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Projects
@@ -358,12 +413,6 @@ export function HistoryPanel() {
             Export CSV
           </button>
           
-          <button
-            onClick={handleClearToday}
-            className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors text-sm"
-          >
-            Clear Today
-          </button>
         </div>
       </div>
 
@@ -394,7 +443,7 @@ export function HistoryPanel() {
       )}
 
       {/* Sessions Table */}
-      <SessionsTable sessions={filteredSessions} showAllProjects={true} />
+      <SessionsTable sessions={filteredSessions} showAllProjects={true} title={getDynamicTitle()} />
     </div>
   )
 }

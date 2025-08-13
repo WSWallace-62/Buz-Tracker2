@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom'
 import { useProjectsStore } from './store/projects'
 import { useSessionsStore } from './store/sessions'
 import { useUIStore } from './store/ui'
@@ -19,11 +20,21 @@ import './styles.css'
 type Tab = 'tracker' | 'history' | 'settings'
 
 export function App() {
+  return (
+    <BrowserRouter>
+      <AppContent />
+    </BrowserRouter>
+  )
+}
+
+function AppContent() {
   const { loadProjects } = useProjectsStore()
   const { loadSessions, loadRunningSession, getTodaySessions } = useSessionsStore()
   const { currentProjectId, setCurrentProject, openAddEntryModal } = useUIStore()
-  const [activeTab, setActiveTab] = useState<Tab>('tracker')
   const [isLoading, setIsLoading] = useState(true)
+  const location = useLocation();
+
+  const activeTab: Tab = location.pathname === '/history' ? 'history' : location.pathname === '/settings' ? 'settings' : 'tracker'
 
   useEffect(() => {
     const initializeApp = async () => {
@@ -58,15 +69,6 @@ export function App() {
         if (e.key === 'n' && e.ctrlKey) {
           e.preventDefault()
           openAddEntryModal()
-        } else if (e.key === '1' && e.ctrlKey) {
-          e.preventDefault()
-          setActiveTab('tracker')
-        } else if (e.key === '2' && e.ctrlKey) {
-          e.preventDefault()
-          setActiveTab('history')
-        } else if (e.key === '3' && e.ctrlKey) {
-          e.preventDefault()
-          setActiveTab('settings')
         }
       }
     }
@@ -116,13 +118,13 @@ export function App() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex space-x-8">
             {[
-              { id: 'tracker' as const, label: 'Time Tracker', shortcut: '1' },
-              { id: 'history' as const, label: 'History', shortcut: '2' },
-              { id: 'settings' as const, label: 'Settings', shortcut: '3' }
+              { id: 'tracker', label: 'Time Tracker', path: '/' },
+              { id: 'history', label: 'History', path: '/history' },
+              { id: 'settings', label: 'Settings', path: '/settings' }
             ].map((tab) => (
-              <button
+              <Link
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                to={tab.path}
                 className={`
                   py-4 px-1 border-b-2 font-medium text-sm transition-colors
                   ${activeTab === tab.id
@@ -130,11 +132,9 @@ export function App() {
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                   }
                 `}
-                aria-pressed={activeTab === tab.id}
-                title={`${tab.label} (Ctrl+${tab.shortcut})`}
               >
                 {tab.label}
-              </button>
+              </Link>
             ))}
           </div>
         </div>
@@ -142,72 +142,69 @@ export function App() {
 
       {/* Main Content */}
       <main id="main-content" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {activeTab === 'tracker' && (
-          <div className="space-y-8">
-            {/* Project Selection */}
-            <div className="max-w-md">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Current Project
-              </label>
-              <ProjectSelect />
+        <Routes>
+          <Route path="/" element={
+            <div className="space-y-8">
+              {/* Project Selection */}
+              <div className="max-w-md">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Current Project
+                </label>
+                <ProjectSelect />
+              </div>
+
+              {/* Stopwatch */}
+              <Stopwatch projectId={currentProjectId} />
+
+              {/* Quick Actions */}
+              <div className="flex flex-wrap gap-4">
+                <button
+                  onClick={openAddEntryModal}
+                  className="btn-primary flex items-center"
+                  title="Add manual time entry (Ctrl+N)"
+                >
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Add Entry
+                </button>
+              </div>
+
+              {/* Today's Sessions */}
+              <SessionsTable projectId={currentProjectId || undefined} />
             </div>
+          } />
+          <Route path="/history" element={<HistoryPanel />} />
+          <Route path="/settings" element={
+            <div className="space-y-8">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <ImportExport />
 
-            {/* Stopwatch */}
-            <Stopwatch projectId={currentProjectId} />
+                <div className="bg-white rounded-lg shadow-md p-6">
+                  <h3 className="text-lg font-semibold mb-4">Keyboard Shortcuts</h3>
+                  <div className="space-y-2 text-sm text-gray-600">
+                    <div><kbd className="bg-gray-100 px-2 py-1 rounded">Ctrl+N</kbd> Add Entry</div>
+                    <div><kbd className="bg-gray-100 px-2 py-1 rounded">Space</kbd> Start/Stop Timer (when stopwatch is focused)</div>
+                    <div><kbd className="bg-gray-100 px-2 py-1 rounded">Enter</kbd> Submit forms</div>
+                    <div><kbd className="bg-gray-100 px-2 py-1 rounded">Escape</kbd> Close modals</div>
+                  </div>
+                </div>
+              </div>
 
-            {/* Quick Actions */}
-            <div className="flex flex-wrap gap-4">
-              <button
-                onClick={openAddEntryModal}
-                className="btn-primary flex items-center"
-                title="Add manual time entry (Ctrl+N)"
-              >
-                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                Add Entry
-              </button>
-            </div>
-
-            {/* Today's Sessions */}
-            <SessionsTable projectId={currentProjectId || undefined} />
-          </div>
-        )}
-
-        {activeTab === 'history' && <HistoryPanel />}
-
-        {activeTab === 'settings' && (
-          <div className="space-y-8">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <ImportExport />
-              
               <div className="bg-white rounded-lg shadow-md p-6">
-                <h3 className="text-lg font-semibold mb-4">Keyboard Shortcuts</h3>
-                <div className="space-y-2 text-sm text-gray-600">
-                  <div><kbd className="bg-gray-100 px-2 py-1 rounded">Ctrl+1</kbd> Time Tracker</div>
-                  <div><kbd className="bg-gray-100 px-2 py-1 rounded">Ctrl+2</kbd> History</div>
-                  <div><kbd className="bg-gray-100 px-2 py-1 rounded">Ctrl+3</kbd> Settings</div>
-                  <div><kbd className="bg-gray-100 px-2 py-1 rounded">Ctrl+N</kbd> Add Entry</div>
-                  <div><kbd className="bg-gray-100 px-2 py-1 rounded">Space</kbd> Start/Stop Timer (when stopwatch is focused)</div>
-                  <div><kbd className="bg-gray-100 px-2 py-1 rounded">Enter</kbd> Submit forms</div>
-                  <div><kbd className="bg-gray-100 px-2 py-1 rounded">Escape</kbd> Close modals</div>
+                <h3 className="text-lg font-semibold mb-4">About BuzTracker</h3>
+                <div className="text-gray-600 space-y-2">
+                  <p>BuzTracker is a local-first time tracking application that works offline.</p>
+                  <p>All your data is stored locally in your browser and never sent to any server.</p>
+                  <p>You can export your data at any time and import it on another device.</p>
+                  <div className="mt-4 text-xs text-gray-500">
+                    Version 1.0.0 • Built with React, TypeScript, and IndexedDB
+                  </div>
                 </div>
               </div>
             </div>
-
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h3 className="text-lg font-semibold mb-4">About BuzTracker</h3>
-              <div className="text-gray-600 space-y-2">
-                <p>BuzTracker is a local-first time tracking application that works offline.</p>
-                <p>All your data is stored locally in your browser and never sent to any server.</p>
-                <p>You can export your data at any time and import it on another device.</p>
-                <div className="mt-4 text-xs text-gray-500">
-                  Version 1.0.0 • Built with React, TypeScript, and IndexedDB
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+          } />
+        </Routes>
       </main>
 
       {/* Modals and Overlays */}

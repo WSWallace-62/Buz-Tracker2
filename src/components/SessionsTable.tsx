@@ -2,16 +2,17 @@ import React, { useState, useEffect } from 'react'
 import { useSessionsStore } from '../store/sessions'
 import { useProjectsStore } from '../store/projects'
 import { useUIStore } from '../store/ui'
-import { formatTime, formatDurationHHMM, isToday } from '../utils/time'
+import { formatTime, formatDurationHHMM, isToday, formatDate } from '../utils/time'
 import { Session } from '../db/dexie'
 
 interface SessionsTableProps {
   projectId?: number
   showAllProjects?: boolean
   sessions?: Session[]
+  title?: string
 }
 
-export function SessionsTable({ projectId, showAllProjects = false, sessions: externalSessions }: SessionsTableProps) {
+export function SessionsTable({ projectId, showAllProjects = false, sessions: externalSessions, title }: SessionsTableProps) {
   const { sessions, getTodaySessions, deleteSession, loadSessions } = useSessionsStore()
   const { projects } = useProjectsStore()
   const { showConfirm, showToast } = useUIStore()
@@ -77,7 +78,7 @@ export function SessionsTable({ projectId, showAllProjects = false, sessions: ex
     return (
       <div className="bg-white rounded-lg shadow-md p-6">
         <h3 className="text-lg font-semibold mb-4">
-          {showAllProjects ? "Today's Sessions" : "Sessions Today"}
+          {title || (showAllProjects ? "Today's Sessions" : "Sessions Today")}
         </h3>
         <div className="text-center py-8 text-gray-500">
           <svg
@@ -99,7 +100,7 @@ export function SessionsTable({ projectId, showAllProjects = false, sessions: ex
     <div className="bg-white rounded-lg shadow-md overflow-hidden">
       <div className="px-6 py-4 border-b border-gray-200">
         <h3 className="text-lg font-semibold">
-          {showAllProjects ? "Today's Sessions" : "Sessions Today"}
+          {title || (showAllProjects ? "Today's Sessions" : "Sessions Today")}
         </h3>
       </div>
       
@@ -107,6 +108,11 @@ export function SessionsTable({ projectId, showAllProjects = false, sessions: ex
         <table className="w-full">
           <thead className="bg-gray-50">
             <tr>
+              {showAllProjects && (
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Date
+                </th>
+              )}
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Start
               </th>
@@ -132,6 +138,11 @@ export function SessionsTable({ projectId, showAllProjects = false, sessions: ex
           <tbody className="divide-y divide-gray-200">
             {displaySessions.map((session) => (
               <tr key={session.id} className="hover:bg-gray-50">
+                {showAllProjects && (
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {formatDate(session.start)}
+                  </td>
+                )}
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                   {formatTime(session.start)}
                 </td>
