@@ -1,6 +1,9 @@
 import { create } from 'zustand'
 import { db, Session, RunningSession } from '../db/dexie'
-import { startOfDay, endOfDay } from '../utils/time'
+import { getAuth } from 'firebase/auth'
+import { addDoc, collection, db as firestoreDb } from 'firebase/firestore'
+import { db as firestoreDb } from '../firebase';
+import { startOfDay, endOfDay } from '../utils/time';
 
 interface SessionsState {
   sessions: Session[]
@@ -185,6 +188,81 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
       set(state => ({
         runningSession: null,
         sessions: [newSession, ...state.sessions]
+      }));
+
+      // Save to Firestore if user is authenticated
+      const user = getAuth().currentUser;
+      if (user) {
+        try {
+          const firestoreSessionData = {
+            ...newSessionData,
+            userId: user.uid,
+            // You might want to exclude the local 'id' from the Firestore data
+            // as Firestore generates its own document ID
+            // You might also want to add a timestamp for server-side ordering
+            // serverTimestamp: serverTimestamp(), // You would need to import serverTimestamp
+          };
+          await addDoc(collection(firestoreDb, "users", user.uid, "sessions"), firestoreSessionData);
+        } catch (firestoreError) {
+          console.error("Error saving session to Firestore:", firestoreError);
+        }
+      }
+  
+    } catch (error) {
+      set({ error: (error as Error).message });
+    }
+  },
+
+  getCurrentElapsed: () => {
+    const running = get().runningSession
+    if (!running) return 0
+    return Date.now() - running.startTs
+  },
+
+  getTodaySessions: (projectId) => {
+    const sessions = get().sessions
+    const today = startOfDay(Date.now())
+    const tomorrow = endOfDay(Date.now())
+    
+    return sessions.filter(s => {
+      const matchesDate = s.start >= today && s.start <= tomorrow
+      const matchesProject = projectId ? s.projectId === projectId : true
+      return matchesDate && matchesProject
+    })
+  },
+
+  getSessionsByDateRange: (start, end, projectIds) => {
+    const sessions = get().sessions
+    
+    return sessions.filter(s => {
+      const matchesDate = s.start >= start && s.start <= end
+      const matchesProject = projectIds ? projectIds.includes(s.projectId) : true
+      return matchesDate && matchesProject
+    })
+  },
+
+  getTotalDuration: (sessions) => {
+    return sessions.reduce((total, session) => total + session.durationMs, 0)
+  },
+
+  clearTodaySessions: async (projectId) => {
+    try {
+      const today = startOfDay(Date.now())
+      const tomorrow = endOfDay(Date.now())
+      
+      const sessionsToDelete = await db.sessions
+        .where('start')
+        .between(today, tomorrow)
+        .and(s => s.projectId === projectId)
+        .toArray()
+      
+      const ids = sessionsToDelete.map(s => s.id!).filter(Boolean)
+      await db.sessions.bulkDelete(ids)
+      
+      set(state => ({
+        sessions: state.sessions.filter(s => 
+          !(s.start >= today && s.start <= tomorrow && s.projectId === projectId)
+        )
       }));
   
     } catch (error) {
