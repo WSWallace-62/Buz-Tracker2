@@ -4,11 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-BuzTracker is a local-first Progressive Web App (PWA) for time tracking and project management. Built with React + TypeScript, it stores data locally using IndexedDB and works completely offline.
+BuzTracker is a time tracking and project management Progressive Web App (PWA) built with React + TypeScript. It is evolving from a strictly local-first application using IndexedDB for storage to integrating Firebase Firestore to allow for saving and accessing session data across multiple devices. The aim is to maintain strong offline capabilities where possible, with data synchronization handled in the background.
 
 ## Development Setup
 
-1. Install dependencies: `npm install`
+1. Install dependencies: `npm install`2. Configure Firebase: Set up a Firebase project and update the configuration in `src/firebase.ts`.
 2. Start dev server: `npm run dev`
 3. Build for production: `npm run build`
 4. Run tests: `npm run test`
@@ -19,7 +19,7 @@ BuzTracker is a local-first Progressive Web App (PWA) for time tracking and proj
 - **Frontend**: React 18 + TypeScript + Tailwind CSS
 - **State Management**: Zustand stores (projects, sessions, ui)
 - **Database**: IndexedDB via Dexie with offline-first design
-- **PWA**: Vite PWA plugin with service worker
+- **Database**: Integrating Firebase Firestore for cloud storage alongside IndexedDB for offline access.
 - **Charts**: Chart.js with react-chartjs-2
 - **Testing**: Vitest with jsdom environment
 
