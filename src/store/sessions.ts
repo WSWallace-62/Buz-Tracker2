@@ -2,8 +2,8 @@ import { create } from 'zustand'
 import { db, Session, RunningSession } from '../db/dexie'
 import { getAuth } from 'firebase/auth'
 import { addDoc, collection, db as firestoreDb } from 'firebase/firestore'
-import { db as firestoreDb } from '../firebase';
-import { startOfDay, endOfDay } from '../utils/time';
+import { startOfDay, endOfDay } from '../utils/time'
+import { doc, updateDoc } from 'firebase/firestore';
 
 interface SessionsState {
   sessions: Session[]
@@ -99,10 +99,71 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
         }
       }
       
+    }
+  },
+
+  updateSession: async (id, updates) => {
+    try {
+      // Recalculate duration if start or stop changed
+      if (updates.start !== undefined || updates.stop !== undefined) {
+        const session = get().sessions.find(s => s.id === id)
+        if (session) {
+          const start = updates.start ?? session.start
+          const stop = updates.stop ?? session.stop
+          if (stop) {
+            updates.durationMs = stop - start
+          }
+        }
+      }
+      
       await db.sessions.update(id, updates)
       
       set(state => ({
         sessions: state.sessions.map(s => 
+          s.id === id ? { ...s, ...updates } : s
+        )
+      }))
+    } catch (error) {
+ set({ error: (error as Error).message })
+    }
+  },
+
+  updateSession: async (id, updates) => {
+    try {
+      // Recalculate duration if start or stop changed
+      if (updates.start !== undefined || updates.stop !== undefined) {
+        const session = get().sessions.find(s => s.id === id)
+        if (session) {
+          const start = updates.start ?? session.start
+          const stop = updates.stop ?? session.stop
+          if (stop) {
+            updates.durationMs = stop - start
+          }
+        }
+      }
+
+      await db.sessions.update(id, updates)
+
+      // Update in Firestore if user is authenticated
+      const user = getAuth().currentUser
+      if (user) {
+        try {
+          // Find the session in the local state to get its Firestore document ID (if stored)
+          // Assuming the Firestore document ID is stored as `firestoreId` in the local Session object
+          const session = get().sessions.find(s => s.id === id);
+          if (session && session.firestoreId) {
+            const sessionDocRef = doc(firestoreDb, 'users', user.uid, 'sessions', session.firestoreId);
+            await updateDoc(sessionDocRef, updates);
+          } else {
+            console.warn("Session not found in local state or no firestoreId to update in Firestore:", id);
+          }
+        } catch (firestoreError) {
+          console.error("Error updating session in Firestore:", firestoreError);
+        }
+      }
+
+      set(state => ({
+        sessions: state.sessions.map(s =>
           s.id === id ? { ...s, ...updates } : s
         )
       }))
@@ -118,6 +179,20 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
       set(state => ({
         sessions: state.sessions.filter(s => s.id !== id)
       }))
+
+      // Delete from Firestore if user is authenticated
+      const user = getAuth().currentUser;
+      if (user) {
+        try {
+          // Find the session in the local state to get its Firestore document ID (if stored)
+          const sessionToDelete = state.sessions.find(s => s.id === id);
+          if (sessionToDelete && sessionToDelete.firestoreId) {
+            const sessionDocRef = doc(firestoreDb, 'users', user.uid, 'sessions', sessionToDelete.firestoreId);
+            await deleteDoc(sessionDocRef);
+          }
+        } catch (firestoreError) {
+          console.error("Error deleting session from Firestore:", firestoreError);
+        }
     } catch (error) {
       set({ error: (error as Error).message })
     }
