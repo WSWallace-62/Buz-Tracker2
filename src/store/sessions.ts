@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { db, Session, RunningSession } from '../db/dexie';
 import { getAuth } from 'firebase/auth';
-import { addDoc, collection, doc, updateDoc, deleteDoc, db as firestoreDb } from 'firebase/firestore'; // Corrected import for firestoreDb
+import { addDoc, collection, doc, updateDoc, deleteDoc } from 'firebase/firestore'; // Corrected import: Removed db
+import { db as firestoreDb } from '../firebase'; // Corrected import: Import db as firestoreDb from '../firebase'
 import { startOfDay, endOfDay } from '../utils/time';
 
 interface SessionsState {
@@ -132,8 +133,8 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
     try {
       await db.sessions.delete(id);
 
-      set(state => ({ // Corrected usage of state
-        sessions: state.sessions.filter((s: Session) => s.id !== id) // Added type annotation
+      set(state => ({
+        sessions: state.sessions.filter((s: Session) => s.id !== id)
       }));
 
       // Delete from Firestore if user is authenticated
@@ -141,7 +142,7 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
       if (user) {
         try {
           // Find the session in the local state to get its Firestore document ID (if stored)
-          const sessionToDelete = get().sessions.find(s => s.id === id); // Use get() to access state
+          const sessionToDelete = get().sessions.find(s => s.id === id);
           if (sessionToDelete && sessionToDelete.firestoreId) {
             const sessionDocRef = doc(firestoreDb, 'users', user.uid, 'sessions', sessionToDelete.firestoreId);
             await deleteDoc(sessionDocRef);
@@ -150,7 +151,7 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
           console.error("Error deleting session from Firestore:", firestoreError);
         }
       }
-    } catch (error) { // Outer catch block
+    } catch (error) {
       set({ error: (error as Error).message });
     }
   },
@@ -236,11 +237,11 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
           };
           const docRef = await addDoc(collection(firestoreDb, "users", user.uid, "sessions"), firestoreSessionData);
           // Optionally, store the Firestore document ID in the local session object
-          // set(state => ({
-          //   sessions: state.sessions.map(s =>
-          //     s.id === newId ? { ...s, firestoreId: docRef.id } : s
-          //   )
-          // }));
+          set(state => ({
+            sessions: state.sessions.map(s =>
+              s.id === newId ? { ...s, firestoreId: docRef.id } : s
+            )
+          }));
         } catch (firestoreError) {
           console.error("Error saving session to Firestore:", firestoreError);
         }
@@ -308,3 +309,4 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
     }
   }
 }));
+
