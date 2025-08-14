@@ -98,49 +98,6 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
           }
         }
       }
-      
-    }
-  },
-
-  updateSession: async (id, updates) => {
-    try {
-      // Recalculate duration if start or stop changed
-      if (updates.start !== undefined || updates.stop !== undefined) {
-        const session = get().sessions.find(s => s.id === id)
-        if (session) {
-          const start = updates.start ?? session.start
-          const stop = updates.stop ?? session.stop
-          if (stop) {
-            updates.durationMs = stop - start
-          }
-        }
-      }
-      
-      await db.sessions.update(id, updates)
-      
-      set(state => ({
-        sessions: state.sessions.map(s => 
-          s.id === id ? { ...s, ...updates } : s
-        )
-      }))
-    } catch (error) {
- set({ error: (error as Error).message })
-    }
-  },
-
-  updateSession: async (id, updates) => {
-    try {
-      // Recalculate duration if start or stop changed
-      if (updates.start !== undefined || updates.stop !== undefined) {
-        const session = get().sessions.find(s => s.id === id)
-        if (session) {
-          const start = updates.start ?? session.start
-          const stop = updates.stop ?? session.stop
-          if (stop) {
-            updates.durationMs = stop - start
-          }
-        }
-      }
 
       await db.sessions.update(id, updates)
 
@@ -193,7 +150,7 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
         } catch (firestoreError) {
           console.error("Error deleting session from Firestore:", firestoreError);
         }
-    } catch (error) {
+      }
       set({ error: (error as Error).message })
     }
   },
