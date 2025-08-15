@@ -50,7 +50,6 @@ export function Auth({ onLogin }: AuthProps) {
       } else {
         setError('An unknown error occurred during password reset.');
       }
-      setError(err.message);
     }
   };
 
