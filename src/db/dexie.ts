@@ -45,7 +45,7 @@ export class BuzTrackerDB extends Dexie {
     
     this.version(2).stores({
       projects: '++id, name, createdAt, archived',
-      sessions: '++id, projectId, start, stop, createdAt, *note', // Ensure no extra 'id' here
+      sessions: '++id, projectId, start, stop, createdAt, *note',
       settings: '++id',
       runningSession: '++id'
     })

@@ -32,7 +32,11 @@ export function Auth({ onLogin }: AuthProps) {
         await signInWithEmailAndPassword(auth, email, password);
       }
     } catch (err: unknown) {
-      setError(err.message);
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('An unknown error occurred during authentication.');
+      }
     }
   };
 
