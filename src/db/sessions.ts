@@ -19,7 +19,7 @@ export const getSessions = async (): Promise<Session[]> => {
   }
   const sessionsCollection = collection(db, "users", user.uid, "sessions") as CollectionReference<Session>;
   const snapshot = await getDocs(sessionsCollection);
-  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  return snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
 };
 
 export const addSession = async (session: Omit<Session, 'id'>) => {
