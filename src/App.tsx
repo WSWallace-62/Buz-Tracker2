@@ -1,81 +1,83 @@
-import { useEffect, useState } from 'react'
-import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom'
-import { useProjectsStore } from './store/projects'
-import { useSessionsStore } from './store/sessions'
-import { useUIStore } from './store/ui'
-import { db } from './db/dexie'
-import { ProjectSelect } from './components/ProjectSelect'
-import { Stopwatch } from './components/Stopwatch'
-import { SessionsTable } from './components/SessionsTable'
-import { AddEntryModal } from './components/AddEntryModal'
-import { ProjectManagerModal } from './components/ProjectManagerModal'
-import { HistoryPanel } from './components/HistoryPanel'
-import { ConfirmDialog } from './components/ConfirmDialog'
-import { Toast } from './components/Toast'
-import { UserProfile } from './components/UserProfile'
-import { InstallButton } from './pwa/InstallButton'
-import { getTotalDuration, formatDurationHHMM } from './utils/time'
-import './styles.css'
+import { useEffect, useState } from 'react';
+import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
+import { useProjectsStore } from './store/projects';
+import { useSessionsStore } from './store/sessions';
+import { useUIStore } from './store/ui';
+import { db } from './db/dexie';
+import { auth } from './firebase';
+import { onAuthStateChanged, signOut, User } from 'firebase/auth';
+import { ProjectSelect } from './components/ProjectSelect';
+import { Stopwatch } from './components/Stopwatch';
+import { SessionsTable } from './components/SessionsTable';
+import { AddEntryModal } from './components/AddEntryModal';
+import { ProjectManagerModal } from './components/ProjectManagerModal';
+import { HistoryPanel } from './components/HistoryPanel';
+import { ConfirmDialog } from './components/ConfirmDialog';
+import { Toast } from './components/Toast';
+import { UserProfile } from './components/UserProfile';
+import { Auth } from './components/Auth';
+import { InstallButton } from './pwa/InstallButton';
+import { getTotalDuration, formatDurationHHMM } from './utils/time';
+import './styles.css';
 
-type Tab = 'tracker' | 'history' | 'settings'
+type Tab = 'tracker' | 'history' | 'settings';
 
 export function App() {
   return (
     <BrowserRouter>
       <AppContent />
     </BrowserRouter>
-  )
+  );
 }
 
 function AppContent() {
-  const { loadProjects } = useProjectsStore()
-  const { loadSessions, loadRunningSession, getTodaySessions } = useSessionsStore()
-  const { currentProjectId, setCurrentProject, openAddEntryModal } = useUIStore()
-  const [isLoading, setIsLoading] = useState(true)
+  const { loadProjects } = useProjectsStore();
+  const { loadSessions, loadRunningSession, getTodaySessions } = useSessionsStore();
+  const { currentProjectId, setCurrentProject, openAddEntryModal } = useUIStore();
+  const [isLoading, setIsLoading] = useState(true);
+  const [user, setUser] = useState<User | null>(null);
+  const [isGuest, setIsGuest] = useState(false);
   const location = useLocation();
 
-  const activeTab: Tab = location.pathname === '/history' ? 'history' : location.pathname === '/settings' ? 'settings' : 'tracker'
+  const activeTab: Tab = location.pathname === '/history' ? 'history' : location.pathname === '/settings' ? 'settings' : 'tracker';
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setIsLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     const initializeApp = async () => {
       try {
-        // Load initial data
         await Promise.all([
           loadProjects(),
           loadSessions(),
-          loadRunningSession()
-        ])
-
-        // Load settings and set current project
-        const settings = await db.settings.toCollection().first()
+          loadRunningSession(),
+        ]);
+        const settings = await db.settings.toCollection().first();
         if (settings?.lastProjectId) {
-          setCurrentProject(settings.lastProjectId)
+          setCurrentProject(settings.lastProjectId);
         }
       } catch (error) {
-        console.error('Failed to initialize app:', error)
-      } finally {
-        setIsLoading(false)
+        console.error('Failed to initialize app:', error);
       }
+    };
+    if (user || isGuest) {
+      initializeApp();
     }
+  }, [user, isGuest, loadProjects, loadSessions, loadRunningSession, setCurrentProject]);
 
-    initializeApp()
-  }, [loadProjects, loadSessions, loadRunningSession, setCurrentProject])
+  const handleLogin = () => {
+    setIsGuest(true);
+  };
 
-  // Handle keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Global shortcuts (when no input is focused)
-      if (!['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement)?.tagName)) {
-        if (e.key === 'n' && e.ctrlKey) {
-          e.preventDefault()
-          openAddEntryModal()
-        }
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [openAddEntryModal])
+  const handleLogout = async () => {
+    await signOut(auth);
+    setIsGuest(false);
+  };
 
   if (isLoading) {
     return (
@@ -85,17 +87,20 @@ function AppContent() {
           <p className="text-gray-600">Loading BuzTracker...</p>
         </div>
       </div>
-    )
+    );
   }
 
-  const todaySessions = getTodaySessions(currentProjectId || undefined)
-  const todayTotal = getTotalDuration(todaySessions)
+  if (!user && !isGuest) {
+    return <Auth onLogin={handleLogin} />;
+  }
+
+  const todaySessions = getTodaySessions(currentProjectId || undefined);
+  const todayTotal = getTotalDuration(todaySessions);
 
   return (
     <div className="min-h-screen bg-gray-50">
       <a href="#main-content" className="skip-link">Skip to main content</a>
       
-      {/* Header */}
       <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
@@ -108,12 +113,19 @@ function AppContent() {
             
             <div className="flex items-center space-x-4">
               <InstallButton />
+              {(user || isGuest) && (
+                <button
+                  onClick={handleLogout}
+                  className="px-3 py-1.5 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700"
+                >
+                  Logout
+                </button>
+              )}
             </div>
           </div>
         </div>
       </header>
 
-      {/* Navigation */}
       <nav className="bg-white border-b border-gray-200" role="navigation" aria-label="Main navigation">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex space-x-8">
@@ -140,23 +152,17 @@ function AppContent() {
         </div>
       </nav>
 
-      {/* Main Content */}
       <main id="main-content" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Routes>
           <Route path="/" element={
             <div className="space-y-8">
-              {/* Project Selection */}
               <div className="max-w-md">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Current Project
                 </label>
                 <ProjectSelect />
               </div>
-
-              {/* Stopwatch */}
               <Stopwatch projectId={currentProjectId} />
-
-              {/* Quick Actions */}
               <div className="flex flex-wrap gap-4">
                 <button
                   onClick={openAddEntryModal}
@@ -169,8 +175,6 @@ function AppContent() {
                   Add Entry
                 </button>
               </div>
-
-              {/* Today's Sessions */}
               <SessionsTable projectId={currentProjectId || undefined} />
             </div>
           } />
@@ -179,7 +183,6 @@ function AppContent() {
             <div className="space-y-8">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <UserProfile />
-
                 <div className="bg-white rounded-lg shadow-md p-6">
                   <h3 className="text-lg font-semibold mb-4">Keyboard Shortcuts</h3>
                   <div className="space-y-2 text-sm text-gray-600">
@@ -190,7 +193,6 @@ function AppContent() {
                   </div>
                 </div>
               </div>
-
               <div className="bg-white rounded-lg shadow-md p-6">
                 <h3 className="text-lg font-semibold mb-4">About BuzTracker</h3>
                 <div className="text-gray-600 space-y-2">
@@ -207,11 +209,10 @@ function AppContent() {
         </Routes>
       </main>
 
-      {/* Modals and Overlays */}
       <AddEntryModal />
       <ProjectManagerModal />
       <ConfirmDialog />
       <Toast />
     </div>
-  )
+  );
 }
