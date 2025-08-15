@@ -131,26 +131,27 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
 
   deleteSession: async (id) => {
     try {
+      const sessionToDelete = get().sessions.find(s => s.id === id);
       await db.sessions.delete(id);
 
-      set(state => ({
-        sessions: state.sessions.filter((s: Session) => s.id !== id)
-      }));
-
+      // Delete from Firestore if user is authenticated
       // Delete from Firestore if user is authenticated
       const user = getAuth().currentUser;
       if (user) {
         try {
-          // Find the session in the local state to get its Firestore document ID (if stored)
-          const sessionToDelete = get().sessions.find(s => s.id === id);
           if (sessionToDelete && sessionToDelete.firestoreId) {
             const sessionDocRef = doc(firestoreDb, 'users', user.uid, 'sessions', sessionToDelete.firestoreId);
             await deleteDoc(sessionDocRef);
           }
         } catch (firestoreError) {
           console.error("Error deleting session from Firestore:", firestoreError);
+ set({ error: (firestoreError as Error).message }); // Handle Firestore deletion errors
         }
       }
+
+      set(state => ({
+        sessions: state.sessions.filter((s: Session) => s.id !== id)
+      })); // Added missing closing curly brace
     } catch (error) {
       set({ error: (error as Error).message });
     }
