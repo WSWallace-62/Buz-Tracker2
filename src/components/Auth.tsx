@@ -7,7 +7,11 @@ import {
   sendPasswordResetEmail,
 } from 'firebase/auth';
 
-export function Auth({ onLogin }) {
+interface AuthProps {
+  onLogin: () => void;
+}
+
+export function Auth({ onLogin }: AuthProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSignUp, setIsSignUp] = useState(true);
@@ -27,7 +31,7 @@ export function Auth({ onLogin }) {
       } else {
         await signInWithEmailAndPassword(auth, email, password);
       }
-    } catch (err) {
+    } catch (err: unknown) {
       setError(err.message);
     }
   };
@@ -40,7 +44,12 @@ export function Auth({ onLogin }) {
     try {
       await sendPasswordResetEmail(auth, email);
       setMessage('A password reset link has been sent to your email.');
-    } catch (err) {
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('An unknown error occurred during password reset.');
+      }
       setError(err.message);
     }
   };
