@@ -16,6 +16,7 @@ export interface Session {
   durationMs: number
   note?: string
   createdAt: number
+  firestoreId?: string;
 }
 
 export interface Settings {
