@@ -7,7 +7,7 @@ import { getStorage } from "firebase/storage";
 // Your web app's Firebase configuration
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: "AIzaSyCjS_EnMZPbMQamZK8Xq33YQxfzzAZOm1A",
+  apiKey: "AIzaSyC5jKXUPs3f7MXbapg62d54PwxdFWIEBzk",
   authDomain: "buz-tracker-fd3e3.firebaseapp.com",
   projectId: "buz-tracker-fd3e3",
   storageBucket: "buz-tracker-fd3e3.firebasestorage.app",
