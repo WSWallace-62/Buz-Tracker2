@@ -51,7 +51,7 @@ export function Auth({ onLogin }: AuthProps) {
     <>
       <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
         <div className="w-full max-w-md p-8 space-y-6 bg-gray-800 rounded-lg shadow-lg">
-          <h1 className="text-4xl font-bold text-center text-indigo-400">Biz-Tracker</h1>
+          <h1 className="text-4xl font-bold text-center text-indigo-400">Buz-Tracker</h1>
           <h2 className="text-3xl font-extrabold text-center text-indigo-400">
             {isSignUp ? 'Create Account' : 'Welcome Back'}
           </h2>
