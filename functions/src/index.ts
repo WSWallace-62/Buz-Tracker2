@@ -8,9 +8,6 @@
  */
 
 import {setGlobalOptions} from "firebase-functions";
-// import {onRequest} from "firebase-functions/https"; // Not used
-// import * as logger from "firebase-functions/logger"; // Not used
-
 // Start writing functions
 // https://firebase.google.com/docs/functions/typescript
 
