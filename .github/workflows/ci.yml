@@ -1,37 +1,32 @@
-name: CI
-
-on:
-  push:
-    branches: [ main, develop ]
-  pull_request:
-    branches: [ main ]
-
 jobs:
   test:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
-    
-    - name: Setup Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: '18'
-        cache: 'npm'
-    
-    - name: Install dependencies
-      run: npm ci
-      working-directory: functions
-    
-    - name: Run linting
-      run: npm run lint -- --fix
-      working-directory: functions
-    
-    # - name: Run type checking
-    #   run: npx tsc --noEmit
-    
-    - name: Run tests
-      run: npm run test -- --run
-    
-    - name: Build application
-      run: npm run build
+      - uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install root dependencies # Add this step
+        run: npm ci
+
+      - name: Install functions dependencies # Keep the original step
+        run: npm ci
+        working-directory: functions
+
+      - name: Run linting
+        run: npm run lint -- --fix
+        working-directory: functions # Check if this working-directory is correct
+
+      # - name: Run type checking # Keep this commented out for now
+      #   run: npx tsc --noEmit
+
+      - name: Run tests # This step should now find vitest
+        run: npm run test -- --run
+
+      - name: Build application
+        run: npm run build
