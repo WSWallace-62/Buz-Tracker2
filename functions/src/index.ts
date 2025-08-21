@@ -21,7 +21,7 @@ import {setGlobalOptions} from "firebase-functions";
 // functions should each use functions.runWith({ maxInstances: 10 }) instead.
 // In the v1 API, each function can only serve one request per container, so
 // this will be the maximum concurrent request count.
-setGlobalOptions({maxInstances: 10}); // Keep default to 10 for better cold start performance
+setGlobalOptions({maxInstances: 10}); // Default to 10 for better cold start
 
 import {getApiKey} from "./getApiKey";
 
