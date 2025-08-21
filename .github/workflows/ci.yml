@@ -21,6 +21,7 @@ jobs:
     
     - name: Install dependencies
       run: npm ci
+      working-directory: functions
     
     - name: Run linting
       run: npm run lint
