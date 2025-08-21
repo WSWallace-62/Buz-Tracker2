@@ -24,7 +24,7 @@ jobs:
       working-directory: functions
     
     - name: Run linting
-      run: npm run lint
+      run: npm run lint -- --fix
       working-directory: functions
     
     - name: Run type checking
