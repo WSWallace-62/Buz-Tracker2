@@ -21,9 +21,11 @@ jobs:
     
     - name: Install dependencies
       run: npm ci
+      working-directory: functions
     
     - name: Run linting
-      run: npm run lint
+      run: npm run lint -- --fix
+      working-directory: functions
     
     - name: Run type checking
       run: npx tsc --noEmit

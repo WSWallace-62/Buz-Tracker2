@@ -5,12 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": ".\\node_modules\\.bin\\tsc && vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "test": "vitest"
   },
   "dependencies": {
+    "@google-cloud/secret-manager": "^6.1.0",
     "chart.js": "^4.4.0",
     "dayjs": "^1.11.9",
     "dexie": "^3.2.4",
@@ -39,7 +40,6 @@
     "jsdom": "^22.1.0",
     "postcss": "^8.4.27",
     "tailwindcss": "^3.3.3",
-    "typescript": "^5.0.2",
     "vite": "^4.4.5",
     "vite-plugin-pwa": "^0.16.4",
     "vitest": "^0.34.3",
