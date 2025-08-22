@@ -13,7 +13,8 @@ export function Stopwatch({ projectId }: StopwatchProps) {
     loadRunningSession,
     startSession,
     stopSession,
-    getCurrentElapsed
+    getCurrentElapsed,
+    discardRunningSession
   } = useSessionsStore()
   
   const { showConfirm, showToast } = useUIStore()
@@ -97,13 +98,30 @@ export function Stopwatch({ projectId }: StopwatchProps) {
   }
 
   const handleReset = () => {
-    setElapsed(0)
-    setNote('')
+    if (isRunning) {
+      showConfirm(
+        'Discard Session?',
+        'Are you sure you want to discard this running session? This action cannot be undone.',
+        async () => {
+          try {
+            await discardRunningSession()
+            setNote('')
+            showToast('Session discarded', 'info')
+          } catch (error) {
+            showToast((error as Error).message, 'error')
+          }
+        }
+      )
+    } else {
+      setElapsed(0)
+      setNote('')
+    }
   }
 
   const handleStop = async () => {
     try {
       await stopSession()
+      setNote('')
       showToast('Session stopped and saved', 'success')
     } catch (error) {
       showToast((error as Error).message, 'error')
@@ -185,13 +203,9 @@ export function Stopwatch({ projectId }: StopwatchProps) {
 
           <button
             onClick={handleReset}
-            disabled={isRunning}
             className={`
               px-6 py-2 rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2
-              ${!isRunning
-                ? 'bg-gray-600 text-white hover:bg-gray-700 focus:ring-gray-500'
-                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              }
+              bg-gray-600 text-white hover:bg-gray-700 focus:ring-gray-500
             `}
             aria-label="Reset timer"
           >

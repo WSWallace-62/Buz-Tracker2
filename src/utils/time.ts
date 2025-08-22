@@ -84,6 +84,14 @@ export function getDateRanges() {
     lastMonth: {
       start: now.subtract(1, 'month').startOf('month').valueOf(),
       end: now.subtract(1, 'month').endOf('month').valueOf()
+    },
+    thisYear: {
+      start: now.startOf('year').valueOf(),
+      end: now.endOf('year').valueOf()
+    },
+    lastYear: {
+      start: now.subtract(1, 'year').startOf('year').valueOf(),
+      end: now.subtract(1, 'year').endOf('year').valueOf()
     }
   }
 }

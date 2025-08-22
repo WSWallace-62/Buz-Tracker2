@@ -25,6 +25,7 @@ interface SessionsState {
   loadRunningSession: () => Promise<void>;
   startSession: (projectId: number, note?: string) => Promise<void>;
   stopSession: () => Promise<void>;
+  discardRunningSession: () => Promise<void>;
   getCurrentElapsed: () => number;
 
   // Queries
@@ -186,6 +187,15 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
       await db.runningSession.add(runningSession);
 
       set({ runningSession });
+    } catch (error) {
+      set({ error: (error as Error).message });
+    }
+  },
+
+  discardRunningSession: async () => {
+    try {
+      await db.runningSession.clear();
+      set({ runningSession: null });
     } catch (error) {
       set({ error: (error as Error).message });
     }
