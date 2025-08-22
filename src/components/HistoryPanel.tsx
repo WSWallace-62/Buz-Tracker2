@@ -27,7 +27,7 @@ ChartJS.register(
   Legend
 )
 
-type DateFilter = 'today' | 'thisWeek' | 'lastWeek' | 'thisMonth' | 'lastMonth' | 'all' | 'custom'
+type DateFilter = 'today' | 'thisWeek' | 'lastWeek' | 'thisMonth' | 'lastMonth' | 'thisYear' | 'lastYear' | 'custom'
 type GroupBy = 'day' | 'project'
 
 export function HistoryPanel() {
@@ -35,7 +35,7 @@ export function HistoryPanel() {
   const { projects } = useProjectsStore()
   const { showToast } = useUIStore()
   
-  const [dateFilter, setDateFilter] = useState<DateFilter>('all')
+  const [dateFilter, setDateFilter] = useState<DateFilter>('thisYear')
   const [customStart, setCustomStart] = useState('')
   const [customEnd, setCustomEnd] = useState('')
   const [selectedProjectIds, setSelectedProjectIds] = useState<number[]>([])
@@ -54,10 +54,6 @@ export function HistoryPanel() {
       }
     }
 
-    if (dateFilter === 'all') {
-      return { startDate: 0, endDate: Date.now() }
-    }
-    
     const range = dateRanges[dateFilter]
     return { startDate: range.start, endDate: range.end }
   }, [dateFilter, customStart, customEnd, dateRanges])
@@ -344,7 +340,8 @@ export function HistoryPanel() {
 
   const getDynamicTitle = () => {
     switch (dateFilter) {
-      case 'all': return "All Sessions"
+      case 'thisYear': return "This Year's Sessions"
+      case 'lastYear': return "Last Year's Sessions"
       case 'today': return "Today's Sessions"
       case 'thisWeek': return "This Week's Sessions"
       case 'lastWeek': return "Last Week's Sessions"
@@ -370,7 +367,8 @@ export function HistoryPanel() {
               onChange={(e) => setDateFilter(e.target.value as DateFilter)}
               className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="all">All</option>
+              <option value="thisYear">This Year</option>
+              <option value="lastYear">Last Year</option>
               <option value="today">Today</option>
               <option value="thisWeek">This Week</option>
               <option value="lastWeek">Last Week</option>
