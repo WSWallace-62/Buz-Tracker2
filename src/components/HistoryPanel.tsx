@@ -437,7 +437,7 @@ export function HistoryPanel() {
               <option value="start-asc">Start Time (Oldest First)</option>
             </select>
           </div>
-          <div>
+          <div className="relative">
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Filter by Note
             </label>
@@ -448,6 +448,27 @@ export function HistoryPanel() {
               placeholder="Enter note text..."
               className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+            {noteFilter && (
+              <button
+                onClick={() => setNoteFilter('')}
+                className="absolute inset-y-0 right-0 top-6 flex items-center pr-3 text-gray-400 hover:text-gray-600"
+                aria-label="Clear filter"
+              >
+                <svg
+                  className="h-5 w-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            )}
           </div>
         </div>
 
