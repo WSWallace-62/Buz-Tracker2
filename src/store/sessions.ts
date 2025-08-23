@@ -171,29 +171,28 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
 
   createSession: async (sessionData) => {
     try {
-      const newSession: Omit<Session, 'id'> = {
+      const isOnline = navigator.onLine;
+      const user = getAuth().currentUser;
+
+      const newSession: Omit<Session, 'id' | 'firestoreId'> = {
         ...sessionData,
         createdAt: Date.now(),
       };
 
-      const id = await db.sessions.add(newSession as Session);
-      const isOnline = navigator.onLine;
-
-      const user = getAuth().currentUser;
       if (user && firestoreDb && isOnline) {
+        // Online: Add to Firestore only. onSnapshot will handle adding to Dexie.
         try {
-          const sessionWithId = { ...newSession, id };
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          const { id: localId, ...firestoreSessionData } = sessionWithId;
-          const docRef = await addDoc(collection(firestoreDb, 'users', user.uid, 'sessions'), firestoreSessionData);
-          await db.sessions.update(id, { firestoreId: docRef.id });
+          await addDoc(collection(firestoreDb, 'users', user.uid, 'sessions'), newSession);
         } catch (firestoreError) {
-          console.error('Error saving session to Firestore:', firestoreError);
-          // If Firestore fails, still update UI locally
-          get().loadSessions();
+
+          console.error('Error saving session to Firestore, saving locally as fallback:', firestoreError);
+          // If Firestore fails, save it locally as a fallback.
+          await db.sessions.add(newSession as Session);
+          get().loadSessions(); // and update UI
         }
       } else {
-        // Offline or not logged in, just update UI locally
+        // Offline or not logged in: Add to Dexie and update UI.
+        await db.sessions.add(newSession as Session);
         get().loadSessions();
       }
     } catch (error) {
