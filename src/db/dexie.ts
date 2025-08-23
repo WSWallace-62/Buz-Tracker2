@@ -43,9 +43,9 @@ export class BuzTrackerDB extends Dexie {
   constructor() {
     super('BuzTrackerDB')
     
-    this.version(2).stores({
+    this.version(3).stores({
       projects: '++id, name, createdAt, archived',
-      sessions: '++id, projectId, start, stop, createdAt, *note',
+      sessions: '++id, projectId, firestoreId, start, stop, createdAt, *note',
       settings: '++id',
       runningSession: '++id'
     })
