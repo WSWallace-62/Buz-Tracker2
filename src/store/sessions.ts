@@ -25,6 +25,7 @@ interface SessionsState {
   loadRunningSession: () => Promise<void>;
   startSession: (projectId: number, note?: string) => Promise<void>;
   stopSession: () => Promise<void>;
+  discardRunningSession: () => Promise<void>;
   getCurrentElapsed: () => number;
 
   // Queries
@@ -103,7 +104,7 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
 
       // Update in Firestore if user is authenticated
       const user = getAuth().currentUser;
-      if (user) {
+      if (user && firestoreDb) {
         try {
           // Find the session in the local state to get its Firestore document ID (if stored)
           // Assuming the Firestore document ID is stored as `firestoreId` in the local Session object
@@ -137,7 +138,7 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
       // Delete from Firestore if user is authenticated
       // Delete from Firestore if user is authenticated
       const user = getAuth().currentUser;
-      if (user) {
+      if (user && firestoreDb) {
         try {
           if (sessionToDelete && sessionToDelete.firestoreId) {
             const sessionDocRef = doc(firestoreDb, 'users', user.uid, 'sessions', sessionToDelete.firestoreId);
@@ -191,6 +192,15 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
     }
   },
 
+  discardRunningSession: async () => {
+    try {
+      await db.runningSession.clear();
+      set({ runningSession: null });
+    } catch (error) {
+      set({ error: (error as Error).message });
+    }
+  },
+
   stopSession: async () => {
     try {
       const running = get().runningSession;
@@ -226,7 +236,7 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
 
       // Save to Firestore if user is authenticated
       const user = getAuth().currentUser;
-      if (user) {
+      if (user && firestoreDb) {
         try {
           const firestoreSessionData = {
             ...newSessionData,
