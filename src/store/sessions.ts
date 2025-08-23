@@ -184,6 +184,7 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
         try {
           await addDoc(collection(firestoreDb, 'users', user.uid, 'sessions'), newSession);
         } catch (firestoreError) {
+
           console.error('Error saving session to Firestore, saving locally as fallback:', firestoreError);
           // If Firestore fails, save it locally as a fallback.
           await db.sessions.add(newSession as Session);
