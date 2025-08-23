@@ -72,14 +72,29 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
     try {
       const newSession: Session = {
         ...sessionData,
-        createdAt: Date.now()
+        createdAt: Date.now(),
       };
 
       const id = await db.sessions.add(newSession);
       const session = { ...newSession, id: id as number };
 
+      // Save to Firestore if user is authenticated
+      const user = getAuth().currentUser;
+      if (user && firestoreDb) {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { id: localId, ...firestoreSessionData } = session;
+          const docRef = await addDoc(collection(firestoreDb, 'users', user.uid, 'sessions'), firestoreSessionData);
+          // Store the Firestore document ID in the local session object
+          await db.sessions.update(id, { firestoreId: docRef.id });
+          session.firestoreId = docRef.id;
+        } catch (firestoreError) {
+          console.error('Error saving session to Firestore:', firestoreError);
+        }
+      }
+
       set(state => ({
-        sessions: [session, ...state.sessions]
+        sessions: [session, ...state.sessions],
       }));
     } catch (error) {
       set({ error: (error as Error).message });
@@ -136,23 +151,24 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
       await db.sessions.delete(id);
 
       // Delete from Firestore if user is authenticated
-      // Delete from Firestore if user is authenticated
       const user = getAuth().currentUser;
       if (user && firestoreDb) {
         try {
           if (sessionToDelete && sessionToDelete.firestoreId) {
             const sessionDocRef = doc(firestoreDb, 'users', user.uid, 'sessions', sessionToDelete.firestoreId);
             await deleteDoc(sessionDocRef);
+          } else {
+            console.warn(`Session with local id ${id} not found in Firestore or firestoreId is missing.`);
           }
         } catch (firestoreError) {
           console.error("Error deleting session from Firestore:", firestoreError);
- set({ error: (firestoreError as Error).message }); // Handle Firestore deletion errors
+          set({ error: (firestoreError as Error).message }); // Handle Firestore deletion errors
         }
       }
 
       set(state => ({
         sessions: state.sessions.filter((s: Session) => s.id !== id)
-      })); // Added missing closing curly brace
+      }));
     } catch (error) {
       set({ error: (error as Error).message });
     }
@@ -211,52 +227,18 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
       const now = Date.now();
       const durationMs = now - running.startTs;
 
-      // Create the completed session object
-      const newSessionData: Omit<Session, 'id'> = {
+      const newSessionData: Omit<Session, 'id' | 'createdAt'> = {
         projectId: running.projectId,
         start: running.startTs,
         stop: now,
         durationMs,
         note: running.note,
-        createdAt: now,
       };
 
-      // Add it to the database
-      const newId = await db.sessions.add(newSessionData);
-      const newSession = { ...newSessionData, id: newId as number };
+      await get().createSession(newSessionData);
 
-      // Clear running session from DB and state
       await db.runningSession.clear();
-
-      // Update state with new session and remove running session
-      set(state => ({
-        runningSession: null,
-        sessions: [newSession, ...state.sessions]
-      }));
-
-      // Save to Firestore if user is authenticated
-      const user = getAuth().currentUser;
-      if (user && firestoreDb) {
-        try {
-          const firestoreSessionData = {
-            ...newSessionData,
-            userId: user.uid,
-            // You might want to exclude the local 'id' from the Firestore data
-            // as Firestore generates its own document ID
-            // You might also want to add a timestamp for server-side ordering
-            // serverTimestamp: serverTimestamp(), // You would need to import serverTimestamp
-          };
-          const docRef = await addDoc(collection(firestoreDb, "users", user.uid, "sessions"), firestoreSessionData);
-          // Optionally, store the Firestore document ID in the local session object
-          set(state => ({
-            sessions: state.sessions.map(s =>
-              s.id === newId ? { ...s, firestoreId: docRef.id } : s
-            )
-          }));
-        } catch (firestoreError) {
-          console.error("Error saving session to Firestore:", firestoreError);
-        }
-      }
+      set({ runningSession: null });
 
     } catch (error) {
       set({ error: (error as Error).message });
