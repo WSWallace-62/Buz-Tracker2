@@ -313,7 +313,9 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
       await get().createSession(newSessionData);
       await db.runningSession.clear();
       set({ runningSession: null });
-    } catch (error)      set({ error: (error as Error).message });
+
+    } catch (error) {
+      set({ error: (error as Error).message });
     }
   },
 
