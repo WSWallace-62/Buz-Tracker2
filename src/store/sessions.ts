@@ -177,10 +177,10 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
       };
 
       const id = await db.sessions.add(newSession as Session);
-      get().loadSessions(); // Update UI immediately
+      const isOnline = navigator.onLine;
 
       const user = getAuth().currentUser;
-      if (user && firestoreDb) {
+      if (user && firestoreDb && isOnline) {
         try {
           const sessionWithId = { ...newSession, id };
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -189,7 +189,12 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
           await db.sessions.update(id, { firestoreId: docRef.id });
         } catch (firestoreError) {
           console.error('Error saving session to Firestore:', firestoreError);
+          // If Firestore fails, still update UI locally
+          get().loadSessions();
         }
+      } else {
+        // Offline or not logged in, just update UI locally
+        get().loadSessions();
       }
     } catch (error) {
       set({ error: (error as Error).message });

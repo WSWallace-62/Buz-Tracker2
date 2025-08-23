@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
+import { useOnlineStatus } from './hooks/useOnlineStatus';
 import { useProjectsStore } from './store/projects';
 import { useSessionsStore } from './store/sessions';
 import { useUIStore } from './store/ui';
@@ -31,6 +32,7 @@ export function App() {
 }
 
 function AppContent() {
+  const isOnline = useOnlineStatus();
   const { loadProjects } = useProjectsStore();
   const { loadSessions, loadRunningSession, getTodaySessions } = useSessionsStore();
   const { currentProjectId, setCurrentProject, openAddEntryModal } = useUIStore();
@@ -124,6 +126,23 @@ function AppContent() {
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
               <h1 className="text-2xl font-bold text-gray-900">BuzTracker</h1>
+              {!isOnline && (
+                <div className="ml-2" title="You are currently offline.">
+                  <svg
+                    className="w-6 h-6 text-red-500"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M18.364 5.636a9 9 0 010 12.728m-12.728 0a9 9 0 010-12.728m12.728 0L5.636 18.364M5.636 5.636l12.728 12.728"
+                    />
+                  </svg>
+                </div>
+              )}
               <div className="ml-4 text-sm text-gray-600">
                 Today: {formatDurationHHMM(todayTotal)}
               </div>
