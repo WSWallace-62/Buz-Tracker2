@@ -1,15 +1,29 @@
 import { create } from 'zustand';
 import { db, Session, RunningSession } from '../db/dexie';
 import { getAuth } from 'firebase/auth';
-import { addDoc, collection, doc, updateDoc, deleteDoc } from 'firebase/firestore'; // Corrected import: Removed db
-import { db as firestoreDb } from '../firebase'; // Corrected import: Import db as firestoreDb from '../firebase'
+import {
+  addDoc,
+  collection,
+  doc,
+  updateDoc,
+  deleteDoc,
+  onSnapshot,
+  query,
+  Unsubscribe,
+  writeBatch,
+} from 'firebase/firestore';
+import { db as firestoreDb } from '../firebase';
 import { startOfDay, endOfDay } from '../utils/time';
+
+// Keep track of the unsubscribe function
+let unsubscribeFromFirestore: Unsubscribe | null = null;
 
 interface SessionsState {
   sessions: Session[];
   runningSession: RunningSession | null;
   isLoading: boolean;
   error: string | null;
+  isSyncing: boolean;
 
   // Actions
   loadSessions: (filters?: {
@@ -17,9 +31,13 @@ interface SessionsState {
     endDate?: number;
     projectIds?: number[];
   }) => Promise<void>;
-  createSession: (session: Omit<Session, 'id' | 'createdAt'>) => Promise<void>;
+  createSession: (session: Omit<Session, 'id' | 'createdAt' | 'firestoreId'>) => Promise<void>;
   updateSession: (id: number, updates: Partial<Session>) => Promise<void>;
   deleteSession: (id: number) => Promise<void>;
+
+  // Sync actions
+  startSync: () => void;
+  stopSync: () => void;
 
   // Running session management
   loadRunningSession: () => Promise<void>;
@@ -40,11 +58,94 @@ interface SessionsState {
 export const useSessionsStore = create<SessionsState>((set, get) => ({
   sessions: [],
   runningSession: null,
-  isLoading: false,
+  isLoading: true,
   error: null,
+  isSyncing: false,
+
+  startSync: () => {
+    const user = getAuth().currentUser;
+    if (!user || !firestoreDb) {
+      console.log("User not logged in or firestore not available. Skipping sync.");
+      get().loadSessions(); // Load local data for logged-out user
+      return;
+    }
+
+    if (unsubscribeFromFirestore) {
+      console.log("Sync already active.");
+      return;
+    }
+
+    set({ isSyncing: true });
+    console.log("Starting Firestore sync...");
+
+    const sessionsCollection = query(collection(firestoreDb, 'users', user.uid, 'sessions'));
+
+    unsubscribeFromFirestore = onSnapshot(sessionsCollection, async (snapshot) => {
+      set({ isLoading: true });
+      const changes = snapshot.docChanges();
+
+      for (const change of changes) {
+        const firestoreSession = { ...change.doc.data(), firestoreId: change.doc.id };
+
+        const existingSession = await db.sessions.where('firestoreId').equals(change.doc.id).first();
+
+        switch (change.type) {
+          case 'added':
+            if (!existingSession) {
+              console.log("Sync: Adding new session from Firestore to Dexie", firestoreSession.firestoreId);
+              await db.sessions.add({
+                projectId: Number(firestoreSession.projectId),
+                start: firestoreSession.start,
+                stop: firestoreSession.stop,
+                durationMs: firestoreSession.durationMs,
+                note: firestoreSession.note,
+                createdAt: firestoreSession.createdAt,
+                firestoreId: firestoreSession.firestoreId,
+              });
+            }
+            break;
+          case 'modified':
+            if (existingSession && existingSession.id) {
+              console.log("Sync: Modifying session in Dexie from Firestore", existingSession.firestoreId);
+              // eslint-disable-next-line @typescript-eslint/no-unused-vars
+              const { id, ...updates } = firestoreSession;
+              await db.sessions.update(existingSession.id, updates);
+            }
+            break;
+          case 'removed':
+            if (existingSession && existingSession.id) {
+              console.log("Sync: Removing session from Dexie from Firestore", existingSession.firestoreId);
+              await db.sessions.delete(existingSession.id);
+            }
+            break;
+        }
+      }
+
+      // After processing all changes, reload the full session list from Dexie
+      // This is simpler than trying to update the state incrementally
+      if (changes.length > 0) {
+        console.log("Sync: Changes detected, reloading sessions from Dexie.");
+        await get().loadSessions();
+      }
+      set({ isLoading: false, isSyncing: false });
+
+    }, (error) => {
+      console.error("Error with Firestore snapshot listener:", error);
+      set({ error: "Failed to sync sessions.", isSyncing: false, isLoading: false });
+    });
+  },
+
+  stopSync: () => {
+    if (unsubscribeFromFirestore) {
+      console.log("Stopping Firestore sync.");
+      unsubscribeFromFirestore();
+      unsubscribeFromFirestore = null;
+      set({ isSyncing: false });
+    }
+  },
 
   loadSessions: async (filters = {}) => {
-    set({ isLoading: true, error: null });
+    if (!get().isSyncing) set({ isLoading: true });
     try {
       let query = db.sessions.orderBy('start').reverse();
 
@@ -70,32 +171,30 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
 
   createSession: async (sessionData) => {
     try {
-      const newSession: Session = {
+      const isOnline = navigator.onLine;
+      const user = getAuth().currentUser;
+
+      const newSession: Omit<Session, 'id' | 'firestoreId'> = {
         ...sessionData,
         createdAt: Date.now(),
       };
 
-      const id = await db.sessions.add(newSession);
-      const session = { ...newSession, id: id as number };
-
-      // Save to Firestore if user is authenticated
-      const user = getAuth().currentUser;
-      if (user && firestoreDb) {
+      if (user && firestoreDb && isOnline) {
+        // Online: Add to Firestore only. onSnapshot will handle adding to Dexie.
         try {
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          const { id: localId, ...firestoreSessionData } = session;
-          const docRef = await addDoc(collection(firestoreDb, 'users', user.uid, 'sessions'), firestoreSessionData);
-          // Store the Firestore document ID in the local session object
-          await db.sessions.update(id, { firestoreId: docRef.id });
-          session.firestoreId = docRef.id;
+          await addDoc(collection(firestoreDb, 'users', user.uid, 'sessions'), newSession);
         } catch (firestoreError) {
-          console.error('Error saving session to Firestore:', firestoreError);
-        }
-      }
 
-      set(state => ({
-        sessions: [session, ...state.sessions],
-      }));
+          console.error('Error saving session to Firestore, saving locally as fallback:', firestoreError);
+          // If Firestore fails, save it locally as a fallback.
+          await db.sessions.add(newSession as Session);
+          get().loadSessions(); // and update UI
+        }
+      } else {
+        // Offline or not logged in: Add to Dexie and update UI.
+        await db.sessions.add(newSession as Session);
+        get().loadSessions();
+      }
     } catch (error) {
       set({ error: (error as Error).message });
     }
@@ -103,9 +202,8 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
 
   updateSession: async (id, updates) => {
     try {
-      // Recalculate duration if start or stop changed
       if (updates.start !== undefined || updates.stop !== undefined) {
-        const session = get().sessions.find(s => s.id === id);
+        const session = await db.sessions.get(id);
         if (session) {
           const start = updates.start ?? session.start;
           const stop = updates.stop ?? session.stop;
@@ -116,30 +214,20 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
       }
 
       await db.sessions.update(id, updates);
+      get().loadSessions();
 
-      // Update in Firestore if user is authenticated
+      const session = await db.sessions.get(id);
       const user = getAuth().currentUser;
-      if (user && firestoreDb) {
+      if (user && firestoreDb && session?.firestoreId) {
         try {
-          // Find the session in the local state to get its Firestore document ID (if stored)
-          // Assuming the Firestore document ID is stored as `firestoreId` in the local Session object
-          const session = get().sessions.find(s => s.id === id);
-          if (session && session.firestoreId) {
             const sessionDocRef = doc(firestoreDb, 'users', user.uid, 'sessions', session.firestoreId);
-            await updateDoc(sessionDocRef, updates);
-          } else {
-            console.warn("Session not found in local state or no firestoreId to update in Firestore:", id);
-          }
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            const { id: localId, firestoreId, ...firestoreUpdates } = { ...session, ...updates };
+            await updateDoc(sessionDocRef, firestoreUpdates);
         } catch (firestoreError) {
           console.error("Error updating session in Firestore:", firestoreError);
         }
       }
-
-      set(state => ({
-        sessions: state.sessions.map(s =>
-          s.id === id ? { ...s, ...updates } : s
-        )
-      }));
     } catch (error) {
       set({ error: (error as Error).message });
     }
@@ -147,28 +235,21 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
 
   deleteSession: async (id) => {
     try {
-      const sessionToDelete = get().sessions.find(s => s.id === id);
-      await db.sessions.delete(id);
+      const sessionToDelete = await db.sessions.get(id);
+      if (!sessionToDelete) return;
 
-      // Delete from Firestore if user is authenticated
+      await db.sessions.delete(id);
+      get().loadSessions();
+
       const user = getAuth().currentUser;
-      if (user && firestoreDb) {
+      if (user && firestoreDb && sessionToDelete.firestoreId) {
         try {
-          if (sessionToDelete && sessionToDelete.firestoreId) {
             const sessionDocRef = doc(firestoreDb, 'users', user.uid, 'sessions', sessionToDelete.firestoreId);
             await deleteDoc(sessionDocRef);
-          } else {
-            console.warn(`Session with local id ${id} not found in Firestore or firestoreId is missing.`);
-          }
         } catch (firestoreError) {
           console.error("Error deleting session from Firestore:", firestoreError);
-          set({ error: (firestoreError as Error).message }); // Handle Firestore deletion errors
         }
       }
-
-      set(state => ({
-        sessions: state.sessions.filter((s: Session) => s.id !== id)
-      }));
     } catch (error) {
       set({ error: (error as Error).message });
     }
@@ -185,7 +266,6 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
 
   startSession: async (projectId, note) => {
     try {
-      // Check if there's already a running session
       const existing = await db.runningSession.toCollection().first();
       if (existing) {
         throw new Error('A session is already running. Please stop it first.');
@@ -201,7 +281,6 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
 
       await db.runningSession.clear();
       await db.runningSession.add(runningSession);
-
       set({ runningSession });
     } catch (error) {
       set({ error: (error as Error).message });
@@ -227,7 +306,7 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
       const now = Date.now();
       const durationMs = now - running.startTs;
 
-      const newSessionData: Omit<Session, 'id' | 'createdAt'> = {
+      const newSessionData: Omit<Session, 'id' | 'createdAt' | 'firestoreId'> = {
         projectId: running.projectId,
         start: running.startTs,
         stop: now,
@@ -236,7 +315,6 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
       };
 
       await get().createSession(newSessionData);
-
       await db.runningSession.clear();
       set({ runningSession: null });
 
@@ -288,18 +366,23 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
         .and(s => s.projectId === projectId)
         .toArray();
 
-      const ids = sessionsToDelete.map(s => s.id!).filter(Boolean);
-      await db.sessions.bulkDelete(ids);
-
-      set(state => ({
-        sessions: state.sessions.filter(s =>
-          !(s.start >= today && s.start <= tomorrow && s.projectId === projectId)
-        )
-      }));
-
+      const user = getAuth().currentUser;
+      if (user && firestoreDb) {
+        const batch = writeBatch(firestoreDb);
+        sessionsToDelete.forEach(session => {
+          if (session.firestoreId) {
+            const docRef = doc(firestoreDb, 'users', user.uid, 'sessions', session.firestoreId);
+            batch.delete(docRef);
+          }
+        });
+        await batch.commit();
+      } else {
+        const ids = sessionsToDelete.map(s => s.id!).filter(Boolean);
+        await db.sessions.bulkDelete(ids);
+        get().loadSessions();
+      }
     } catch (error) {
       set({ error: (error as Error).message });
     }
   }
 }));
-
