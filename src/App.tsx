@@ -41,22 +41,40 @@ function AppContent() {
 
   const activeTab: Tab = location.pathname === '/history' ? 'history' : location.pathname === '/settings' ? 'settings' : 'tracker';
 
+  const { startSync, stopSync } = useSessionsStore();
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       setIsLoading(false);
+      if (currentUser) {
+        startSync();
+      } else {
+        stopSync();
+      }
     });
-    return () => unsubscribe();
-  }, []);
+    return () => {
+      unsubscribe();
+      stopSync(); // Also stop sync on component unmount
+    };
+  }, [startSync, stopSync]);
 
   useEffect(() => {
     const initializeApp = async () => {
       try {
-        await Promise.all([
-          loadProjects(),
-          loadSessions(),
-          loadRunningSession(),
-        ]);
+        // For guests, just load local data. For users, sync will handle it.
+        if (isGuest) {
+          await Promise.all([
+            loadProjects(),
+            loadSessions(),
+            loadRunningSession(),
+          ]);
+        } else if (user) {
+          // Initial load for logged-in user, sync will keep it updated
+          await Promise.all([loadProjects(), loadRunningSession()]);
+          // `startSync` will handle loading sessions
+        }
+
         const settings = await db.settings.toCollection().first();
         if (settings?.lastProjectId) {
           setCurrentProject(settings.lastProjectId);
