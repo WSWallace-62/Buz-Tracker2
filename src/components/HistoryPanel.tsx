@@ -1,9 +1,12 @@
 import { useState, useMemo } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db } from '../db/dexie'
+import { db as dexieDB } from '../db/dexie'
+import { db as firestoreDB, firebaseInitializedPromise } from '../firebase'
+import { collection, addDoc, getDocs, query, where } from 'firebase/firestore'
 import { useSessionsStore } from '../store/sessions'
 import { useProjectsStore } from '../store/projects'
 import { useUIStore } from '../store/ui'
+import { useAuthStore } from '../store/auth'
 import { getDateRanges, formatDurationHours, formatDate } from '../utils/time'
 import { SessionsTable } from './SessionsTable'
 import {
@@ -34,6 +37,7 @@ export function HistoryPanel() {
   const { getTotalDuration } = useSessionsStore()
   const { projects } = useProjectsStore()
   const { showToast } = useUIStore()
+  const { user } = useAuthStore()
   
   const [dateFilter, setDateFilter] = useState<DateFilter>('thisYear')
   const [customStart, setCustomStart] = useState('')
@@ -59,7 +63,7 @@ export function HistoryPanel() {
   }, [dateFilter, customStart, customEnd, dateRanges])
 
   const sessions = useLiveQuery(() => {
-    const query = db.sessions
+    const query = dexieDB.sessions
       .where('start')
       .between(startDate, endDate)
 
@@ -250,12 +254,19 @@ export function HistoryPanel() {
     showToast('Sessions exported to CSV', 'success')
   }
 
-  const importCSV = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const importCSV = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!user) {
+      showToast('You must be logged in to import data.', 'error');
+      return;
+    }
+
     const file = event.target.files?.[0]
     if (!file) {
       showToast('No file selected', 'error')
       return
     }
+
+    await firebaseInitializedPromise
 
     Papa.parse(file, {
       header: true,
@@ -284,7 +295,6 @@ export function HistoryPanel() {
           if (isNaN(start) || isNaN(stop) || durationMs < 0) return null
 
           return {
-            // Find project by name, or create a new one
             projectName: row['Project'],
             start,
             stop,
@@ -299,37 +309,48 @@ export function HistoryPanel() {
         }
 
         try {
-          await db.transaction('rw', db.projects, db.sessions, async () => {
-            for (const session of importedSessions) {
-              const project = projects.find(p => p.name === session.projectName)
-              let projectId
-              if (!project) {
-                // Create new project with a random color
-                const newProject = {
-                  name: session.projectName,
-                  color: `#${Math.floor(Math.random()*16777215).toString(16)}`,
-                  archived: false,
-                  createdAt: Date.now()
-                }
-                projectId = await db.projects.add(newProject)
-              } else {
-                projectId = project.id
-              }
+          if (!firestoreDB) {
+            throw new Error("Firestore is not initialized");
+          }
 
-              await db.sessions.add({
-                projectId: projectId as number,
-                start: session.start,
-                stop: session.stop,
-                durationMs: session.durationMs,
-                note: session.note,
+          const projectsCol = collection(firestoreDB, 'users', user.uid, 'projects');
+          const sessionsCol = collection(firestoreDB, 'users', user.uid, 'sessions');
+
+          for (const session of importedSessions) {
+            const q = query(projectsCol, where("name", "==", session.projectName));
+            const querySnapshot = await getDocs(q);
+
+            let projectId: string;
+
+            if (querySnapshot.empty) {
+              const newProject = {
+                name: session.projectName,
+                color: `#${Math.floor(Math.random()*16777215).toString(16)}`,
+                archived: false,
                 createdAt: Date.now()
-              })
+              };
+              const docRef = await addDoc(projectsCol, newProject);
+              projectId = docRef.id;
+            } else {
+              projectId = querySnapshot.docs[0].id;
             }
-          })
-          showToast(`Successfully imported ${importedSessions.length} sessions.`, 'success')
+
+            const newSession = {
+              projectId: projectId,
+              start: session.start,
+              stop: session.stop,
+              durationMs: session.durationMs,
+              note: session.note,
+              createdAt: Date.now()
+            };
+
+            await addDoc(sessionsCol, newSession);
+          }
+
+          showToast(`Successfully imported ${importedSessions.length} sessions to Firestore.`, 'success')
         } catch(error) {
-          console.error("Failed to import sessions", error)
-          showToast('Failed to import sessions', 'error')
+          console.error("Failed to import sessions to Firestore", error)
+          showToast('Failed to import sessions to Firestore', 'error')
         }
       },
       error: (error) => {
@@ -527,13 +548,19 @@ export function HistoryPanel() {
             Export CSV
           </button>
 
-          <label className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors text-sm cursor-pointer">
+          <label
+            className={`px-4 py-2 bg-purple-600 text-white rounded-md transition-colors text-sm ${
+              !user ? 'opacity-50 cursor-not-allowed' : 'hover:bg-purple-700 cursor-pointer'
+            }`}
+            title={!user ? "You must be logged in to import data" : "Import sessions from a CSV file"}
+          >
             Import CSV
             <input
               type="file"
               className="hidden"
               accept=".csv"
               onChange={importCSV}
+              disabled={!user}
             />
           </label>
         </div>
