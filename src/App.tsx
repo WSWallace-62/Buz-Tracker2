@@ -4,6 +4,7 @@ import { useOnlineStatus } from './hooks/useOnlineStatus';
 import { useProjectsStore } from './store/projects';
 import { useSessionsStore } from './store/sessions';
 import { useUIStore } from './store/ui';
+import { useAuthStore } from './store/auth';
 import { db } from './db/dexie';
 import { auth } from './firebase';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
@@ -36,8 +37,8 @@ function AppContent() {
   const { loadProjects } = useProjectsStore();
   const { loadSessions, loadRunningSession, getTodaySessions } = useSessionsStore();
   const { currentProjectId, setCurrentProject, openAddEntryModal } = useUIStore();
+  const { user, setUser } = useAuthStore();
   const [isLoading, setIsLoading] = useState(true);
-  const [user, setUser] = useState<User | null>(null);
   const [isGuest, setIsGuest] = useState(false);
   const location = useLocation();
 

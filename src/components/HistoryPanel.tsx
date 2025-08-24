@@ -6,6 +6,7 @@ import { collection, addDoc, getDocs, query, where } from 'firebase/firestore'
 import { useSessionsStore } from '../store/sessions'
 import { useProjectsStore } from '../store/projects'
 import { useUIStore } from '../store/ui'
+import { useAuthStore } from '../store/auth'
 import { getDateRanges, formatDurationHours, formatDate } from '../utils/time'
 import { SessionsTable } from './SessionsTable'
 import {
@@ -36,6 +37,7 @@ export function HistoryPanel() {
   const { getTotalDuration } = useSessionsStore()
   const { projects } = useProjectsStore()
   const { showToast } = useUIStore()
+  const { user } = useAuthStore()
   
   const [dateFilter, setDateFilter] = useState<DateFilter>('thisYear')
   const [customStart, setCustomStart] = useState('')
@@ -253,6 +255,11 @@ export function HistoryPanel() {
   }
 
   const importCSV = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!user) {
+      showToast('You must be logged in to import data.', 'error');
+      return;
+    }
+
     const file = event.target.files?.[0]
     if (!file) {
       showToast('No file selected', 'error')
@@ -288,7 +295,6 @@ export function HistoryPanel() {
           if (isNaN(start) || isNaN(stop) || durationMs < 0) return null
 
           return {
-            // Find project by name, or create a new one
             projectName: row['Project'],
             start,
             stop,
@@ -303,45 +309,32 @@ export function HistoryPanel() {
         }
 
         try {
-          const userId = "NGzZTDnWKpQOxXzB4PmpmUSGFau2"; // Hardcoded user ID as requested
           if (!firestoreDB) {
             throw new Error("Firestore is not initialized");
           }
 
-          const projectsCol = collection(firestoreDB, 'users', userId, 'projects');
-          const sessionsCol = collection(firestoreDB, 'users', userId, 'sessions');
-
-          console.log(`Starting import for user ${userId}. Found ${importedSessions.length} sessions in CSV.`);
+          const projectsCol = collection(firestoreDB, 'users', user.uid, 'projects');
+          const sessionsCol = collection(firestoreDB, 'users', user.uid, 'sessions');
 
           for (const session of importedSessions) {
-            // Find project by name in Firestore, or create a new one
             const q = query(projectsCol, where("name", "==", session.projectName));
             const querySnapshot = await getDocs(q);
 
             let projectId: string;
-            let projectColor: string;
 
             if (querySnapshot.empty) {
-              // Project not found, create it
               const newProject = {
                 name: session.projectName,
                 color: `#${Math.floor(Math.random()*16777215).toString(16)}`,
                 archived: false,
                 createdAt: Date.now()
               };
-              console.log("Creating new project:", newProject);
               const docRef = await addDoc(projectsCol, newProject);
               projectId = docRef.id;
-              projectColor = newProject.color;
             } else {
-              // Project found
-              const projectDoc = querySnapshot.docs[0];
-              projectId = projectDoc.id;
-              projectColor = projectDoc.data().color;
-              console.log(`Found existing project "${session.projectName}" with ID: ${projectId}`);
+              projectId = querySnapshot.docs[0].id;
             }
 
-            // Create the session document
             const newSession = {
               projectId: projectId,
               start: session.start,
@@ -351,12 +344,10 @@ export function HistoryPanel() {
               createdAt: Date.now()
             };
 
-            console.log("Adding new session:", newSession);
             await addDoc(sessionsCol, newSession);
           }
 
           showToast(`Successfully imported ${importedSessions.length} sessions to Firestore.`, 'success')
-          console.log("Import complete.");
         } catch(error) {
           console.error("Failed to import sessions to Firestore", error)
           showToast('Failed to import sessions to Firestore', 'error')
@@ -557,13 +548,19 @@ export function HistoryPanel() {
             Export CSV
           </button>
 
-          <label className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors text-sm cursor-pointer">
+          <label
+            className={`px-4 py-2 bg-purple-600 text-white rounded-md transition-colors text-sm ${
+              !user ? 'opacity-50 cursor-not-allowed' : 'hover:bg-purple-700 cursor-pointer'
+            }`}
+            title={!user ? "You must be logged in to import data" : "Import sessions from a CSV file"}
+          >
             Import CSV
             <input
               type="file"
               className="hidden"
               accept=".csv"
               onChange={importCSV}
+              disabled={!user}
             />
           </label>
         </div>
