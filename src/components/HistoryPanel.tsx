@@ -1,6 +1,8 @@
 import { useState, useMemo } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db } from '../db/dexie'
+import { db as dexieDB } from '../db/dexie'
+import { db as firestoreDB, firebaseInitializedPromise } from '../firebase'
+import { collection, addDoc, getDocs, query, where } from 'firebase/firestore'
 import { useSessionsStore } from '../store/sessions'
 import { useProjectsStore } from '../store/projects'
 import { useUIStore } from '../store/ui'
@@ -59,7 +61,7 @@ export function HistoryPanel() {
   }, [dateFilter, customStart, customEnd, dateRanges])
 
   const sessions = useLiveQuery(() => {
-    const query = db.sessions
+    const query = dexieDB.sessions
       .where('start')
       .between(startDate, endDate)
 
@@ -250,12 +252,14 @@ export function HistoryPanel() {
     showToast('Sessions exported to CSV', 'success')
   }
 
-  const importCSV = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const importCSV = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) {
       showToast('No file selected', 'error')
       return
     }
+
+    await firebaseInitializedPromise
 
     Papa.parse(file, {
       header: true,
@@ -299,37 +303,63 @@ export function HistoryPanel() {
         }
 
         try {
-          await db.transaction('rw', db.projects, db.sessions, async () => {
-            for (const session of importedSessions) {
-              const project = projects.find(p => p.name === session.projectName)
-              let projectId
-              if (!project) {
-                // Create new project with a random color
-                const newProject = {
-                  name: session.projectName,
-                  color: `#${Math.floor(Math.random()*16777215).toString(16)}`,
-                  archived: false,
-                  createdAt: Date.now()
-                }
-                projectId = await db.projects.add(newProject)
-              } else {
-                projectId = project.id
-              }
+          const userId = "NGzZTDnWKpQOxXzB4PmpmUSGFau2"; // Hardcoded user ID as requested
+          if (!firestoreDB) {
+            throw new Error("Firestore is not initialized");
+          }
 
-              await db.sessions.add({
-                projectId: projectId as number,
-                start: session.start,
-                stop: session.stop,
-                durationMs: session.durationMs,
-                note: session.note,
+          const projectsCol = collection(firestoreDB, 'users', userId, 'projects');
+          const sessionsCol = collection(firestoreDB, 'users', userId, 'sessions');
+
+          console.log(`Starting import for user ${userId}. Found ${importedSessions.length} sessions in CSV.`);
+
+          for (const session of importedSessions) {
+            // Find project by name in Firestore, or create a new one
+            const q = query(projectsCol, where("name", "==", session.projectName));
+            const querySnapshot = await getDocs(q);
+
+            let projectId: string;
+            let projectColor: string;
+
+            if (querySnapshot.empty) {
+              // Project not found, create it
+              const newProject = {
+                name: session.projectName,
+                color: `#${Math.floor(Math.random()*16777215).toString(16)}`,
+                archived: false,
                 createdAt: Date.now()
-              })
+              };
+              console.log("Creating new project:", newProject);
+              const docRef = await addDoc(projectsCol, newProject);
+              projectId = docRef.id;
+              projectColor = newProject.color;
+            } else {
+              // Project found
+              const projectDoc = querySnapshot.docs[0];
+              projectId = projectDoc.id;
+              projectColor = projectDoc.data().color;
+              console.log(`Found existing project "${session.projectName}" with ID: ${projectId}`);
             }
-          })
-          showToast(`Successfully imported ${importedSessions.length} sessions.`, 'success')
+
+            // Create the session document
+            const newSession = {
+              projectId: projectId,
+              start: session.start,
+              stop: session.stop,
+              durationMs: session.durationMs,
+              note: session.note,
+              createdAt: Date.now()
+            };
+
+            console.log("Adding new session:", newSession);
+            await addDoc(sessionsCol, newSession);
+          }
+
+          showToast(`Successfully imported ${importedSessions.length} sessions to Firestore.`, 'success')
+          console.log("Import complete.");
         } catch(error) {
-          console.error("Failed to import sessions", error)
-          showToast('Failed to import sessions', 'error')
+          console.error("Failed to import sessions to Firestore", error)
+          showToast('Failed to import sessions to Firestore', 'error')
         }
       },
       error: (error) => {
