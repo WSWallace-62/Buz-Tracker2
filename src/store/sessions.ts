@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { db, Session, RunningSession } from '../db/dexie';
 import { getAuth } from 'firebase/auth';
+import { useProjectsStore } from './projects';
 import {
   addDoc,
   collection,
@@ -91,27 +92,31 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
 
         switch (change.type) {
           case 'added':
-            if (!existingSession) {
-              console.log("Sync: Adding new session from Firestore to Dexie", firestoreSession.firestoreId);
-              await db.sessions.add({
-                projectId: Number(firestoreSession.projectId),
-                start: firestoreSession.start,
-                stop: firestoreSession.stop,
-                durationMs: firestoreSession.durationMs,
-                note: firestoreSession.note,
-                createdAt: firestoreSession.createdAt,
-                firestoreId: firestoreSession.firestoreId,
-              });
-            }
-            break;
-          case 'modified':
-            if (existingSession && existingSession.id) {
-              console.log("Sync: Modifying session in Dexie from Firestore", existingSession.firestoreId);
+          case 'modified': {
+            const projects = useProjectsStore.getState().projects;
+            const firestoreProjectId = firestoreSession.projectId as string;
+            const localProject = projects.find(p => p.firestoreId === firestoreProjectId);
+
+            if (localProject && localProject.id) {
+              const sessionForDexie = {
+                ...firestoreSession,
+                projectId: localProject.id, // Use local numeric ID
+              };
               // eslint-disable-next-line @typescript-eslint/no-unused-vars
-              const { id, ...updates } = firestoreSession;
-              await db.sessions.update(existingSession.id, updates);
+              const { id, ...dexieData } = sessionForDexie;
+
+              if (change.type === 'added' && !existingSession) {
+                console.log("Sync: Adding new session from Firestore to Dexie", firestoreSession.firestoreId);
+                await db.sessions.add(dexieData);
+              } else if (change.type === 'modified' && existingSession?.id) {
+                console.log("Sync: Modifying session in Dexie from Firestore", existingSession.firestoreId);
+                await db.sessions.update(existingSession.id, dexieData);
+              }
+            } else {
+              console.warn(`Sync: Could not find local project for Firestore projectId ${firestoreProjectId}. Session ${firestoreSession.firestoreId} may not be associated correctly.`);
             }
             break;
+          }
           case 'removed':
             if (existingSession && existingSession.id) {
               console.log("Sync: Removing session from Dexie from Firestore", existingSession.firestoreId);
@@ -174,25 +179,38 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
       const isOnline = navigator.onLine;
       const user = getAuth().currentUser;
 
-      const newSession: Omit<Session, 'id' | 'firestoreId'> = {
+      // This is the Dexie object, with a numeric projectId.
+      const newSessionForDexie: Omit<Session, 'id' | 'firestoreId'> = {
         ...sessionData,
         createdAt: Date.now(),
       };
 
       if (user && firestoreDb && isOnline) {
-        // Online: Add to Firestore only. onSnapshot will handle adding to Dexie.
-        try {
-          await addDoc(collection(firestoreDb, 'users', user.uid, 'sessions'), newSession);
-        } catch (firestoreError) {
+        // Online: Add to Firestore. onSnapshot will handle adding to Dexie.
+        const projects = useProjectsStore.getState().projects;
+        const project = projects.find(p => p.id === sessionData.projectId);
 
+        if (!project?.firestoreId) {
+          throw new Error(`Project with Dexie ID ${sessionData.projectId} does not have a Firestore ID. Cannot save session.`);
+        }
+
+        const newSessionForFirestore = {
+          ...newSessionForDexie,
+          projectId: project.firestoreId, // Use the string ID for Firestore
+        };
+
+        try {
+          // We don't wait for this. The snapshot listener will update the UI.
+          addDoc(collection(firestoreDb, 'users', user.uid, 'sessions'), newSessionForFirestore);
+        } catch (firestoreError) {
           console.error('Error saving session to Firestore, saving locally as fallback:', firestoreError);
           // If Firestore fails, save it locally as a fallback.
-          await db.sessions.add(newSession as Session);
+          await db.sessions.add(newSessionForDexie as Session);
           get().loadSessions(); // and update UI
         }
       } else {
         // Offline or not logged in: Add to Dexie and update UI.
-        await db.sessions.add(newSession as Session);
+        await db.sessions.add(newSessionForDexie as Session);
         get().loadSessions();
       }
     } catch (error) {
@@ -202,6 +220,7 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
 
   updateSession: async (id, updates) => {
     try {
+      // First, update Dexie
       if (updates.start !== undefined || updates.stop !== undefined) {
         const session = await db.sessions.get(id);
         if (session) {
@@ -212,18 +231,32 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
           }
         }
       }
-
       await db.sessions.update(id, updates);
       get().loadSessions();
 
+      // Then, update Firestore
       const session = await db.sessions.get(id);
       const user = getAuth().currentUser;
       if (user && firestoreDb && session?.firestoreId) {
+        // Create a separate object for Firestore updates
+        const firestoreUpdates: Partial<Session> & { projectId?: string } = { ...updates };
+
+        // If projectId is being updated, we need to convert the Dexie ID (number)
+        // to a Firestore ID (string).
+        if (updates.projectId !== undefined) {
+          const projects = useProjectsStore.getState().projects;
+          const project = projects.find(p => p.id === updates.projectId);
+          if (!project?.firestoreId) {
+            throw new Error(`Cannot update session: Project with Dexie ID ${updates.projectId} has no Firestore ID.`);
+          }
+          firestoreUpdates.projectId = project.firestoreId;
+        }
+
         try {
             const sessionDocRef = doc(firestoreDb, 'users', user.uid, 'sessions', session.firestoreId);
             // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            const { id: localId, firestoreId, ...firestoreUpdates } = { ...session, ...updates };
-            await updateDoc(sessionDocRef, firestoreUpdates);
+            const { id: localId, firestoreId, ...finalUpdates } = { ...session, ...firestoreUpdates };
+            await updateDoc(sessionDocRef, finalUpdates);
         } catch (firestoreError) {
           console.error("Error updating session in Firestore:", firestoreError);
         }

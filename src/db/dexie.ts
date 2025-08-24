@@ -6,6 +6,7 @@ export interface Project {
   color: string
   createdAt: number
   archived: boolean
+  firestoreId?: string;
 }
 
 export interface Session {
@@ -43,8 +44,8 @@ export class BuzTrackerDB extends Dexie {
   constructor() {
     super('BuzTrackerDB')
     
-    this.version(3).stores({
-      projects: '++id, name, createdAt, archived',
+    this.version(4).stores({
+      projects: '++id, firestoreId, name, createdAt, archived',
       sessions: '++id, projectId, firestoreId, start, stop, createdAt, *note',
       settings: '++id',
       runningSession: '++id'
