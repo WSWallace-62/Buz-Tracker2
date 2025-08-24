@@ -34,8 +34,8 @@ export function App() {
 
 function AppContent() {
   const isOnline = useOnlineStatus();
-  const { loadProjects } = useProjectsStore();
-  const { loadSessions, loadRunningSession, getTodaySessions } = useSessionsStore();
+  const { reconcileProjects } = useProjectsStore();
+  const { loadSessions, loadRunningSession, getTodaySessions, startSync, stopSync } = useSessionsStore();
   const { currentProjectId, setCurrentProject, openAddEntryModal } = useUIStore();
   const { user, setUser } = useAuthStore();
   const [isLoading, setIsLoading] = useState(true);
@@ -44,52 +44,42 @@ function AppContent() {
 
   const activeTab: Tab = location.pathname === '/history' ? 'history' : location.pathname === '/settings' ? 'settings' : 'tracker';
 
-  const { startSync, stopSync } = useSessionsStore();
-
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const initializeApp = async (currentUser: User | null) => {
       setUser(currentUser);
-      setIsLoading(false);
+
       if (currentUser) {
+        // For logged-in users, reconcile projects first, then start session sync
+        await reconcileProjects();
+        await loadRunningSession();
         startSync();
-      } else {
-        stopSync();
+      } else if (isGuest) {
+        // For guests, just load all data from Dexie
+        await Promise.all([
+          reconcileProjects(), // Effectively just loads from Dexie if not logged in
+          loadSessions(),
+          loadRunningSession(),
+        ]);
       }
-    });
-    return () => {
-      unsubscribe();
-      stopSync(); // Also stop sync on component unmount
-    };
-  }, [startSync, stopSync]);
 
-  useEffect(() => {
-    const initializeApp = async () => {
-      try {
-        // For guests, just load local data. For users, sync will handle it.
-        if (isGuest) {
-          await Promise.all([
-            loadProjects(),
-            loadSessions(),
-            loadRunningSession(),
-          ]);
-        } else if (user) {
-          // Initial load for logged-in user, sync will keep it updated
-          await Promise.all([loadProjects(), loadRunningSession()]);
-          // `startSync` will handle loading sessions
-        }
-
+      // Common initialization for both users and guests
+      if(currentUser || isGuest) {
         const settings = await db.settings.toCollection().first();
         if (settings?.lastProjectId) {
           setCurrentProject(settings.lastProjectId);
         }
-      } catch (error) {
-        console.error('Failed to initialize app:', error);
       }
+
+      setIsLoading(false);
     };
-    if (user || isGuest) {
-      initializeApp();
-    }
-  }, [user, isGuest, loadProjects, loadSessions, loadRunningSession, setCurrentProject]);
+
+    const unsubscribe = onAuthStateChanged(auth, initializeApp);
+
+    return () => {
+      unsubscribe();
+      stopSync();
+    };
+  }, [isGuest, setUser, reconcileProjects, loadSessions, loadRunningSession, startSync, stopSync, setCurrentProject]);
 
   const handleLogin = () => {
     setIsGuest(true);
