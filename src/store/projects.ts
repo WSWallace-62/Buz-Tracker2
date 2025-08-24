@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { db, Project } from '../db/dexie'
 import { db as firestoreDB, firebaseInitializedPromise } from '../firebase'
-import { collection, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore'
+import { collection, addDoc, doc, updateDoc, deleteDoc, getDocs } from 'firebase/firestore'
 import { useAuthStore } from './auth'
 
 interface ProjectsState {
@@ -14,6 +14,7 @@ interface ProjectsState {
   createProject: (project: Omit<Project, 'id' | 'createdAt'>) => Promise<void>
   updateProject: (id: number, updates: Partial<Project>) => Promise<void>
   deleteProject: (id: number) => Promise<void>
+  reconcileProjects: () => Promise<void>
   archiveProject: (id: number, archived: boolean) => Promise<void>
 }
 
@@ -125,6 +126,78 @@ export const useProjectsStore = create<ProjectsState>((set, get) => ({
       }))
     } catch (error) {
       set({ error: (error as Error).message })
+    }
+  },
+
+  reconcileProjects: async () => {
+    const { user } = useAuthStore.getState()
+    if (!user) return; // Not logged in, nothing to reconcile
+
+    set({ isLoading: true, error: null });
+    console.log("Reconciling projects...");
+
+    try {
+      await firebaseInitializedPromise;
+      if (!firestoreDB) throw new Error("Firestore not initialized");
+
+      const projectsCol = collection(firestoreDB, 'users', user.uid, 'projects');
+
+      // 1. Fetch all data from both sources
+      const firestoreSnapshot = await getDocs(projectsCol);
+      const firestoreProjects = firestoreSnapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id } as Project));
+      const dexieProjects = await db.projects.toArray();
+
+      const dexieProjectsByName = new Map(dexieProjects.map(p => [p.name, p]));
+      const firestoreProjectsByName = new Map(firestoreProjects.map(p => [p.name, p]));
+
+      // 2. Sync Firestore projects down to Dexie
+      for (const fsProject of firestoreProjects) {
+        const dexieMatch = dexieProjectsByName.get(fsProject.name);
+        if (dexieMatch) {
+          // Project exists in Dexie, check if firestoreId is missing
+          if (!dexieMatch.firestoreId && dexieMatch.id) {
+            console.log(`Reconcile: Updating Dexie project "${fsProject.name}" with Firestore ID.`);
+            await db.projects.update(dexieMatch.id, { firestoreId: fsProject.firestoreId });
+          }
+        } else {
+          // Project does not exist in Dexie, add it
+          console.log(`Reconcile: Adding Firestore project "${fsProject.name}" to Dexie.`);
+          await db.projects.add(fsProject);
+        }
+      }
+
+      // 3. Sync Dexie projects up to Firestore
+      for (const dxProject of dexieProjects) {
+        if (!dxProject.firestoreId) {
+          // This project was likely created offline.
+          // Check if a project with the same name now exists on Firestore to avoid duplicates.
+          const firestoreMatch = firestoreProjectsByName.get(dxProject.name);
+          if (firestoreMatch) {
+            // A project with this name was created on another device. Link them.
+            if(dxProject.id) {
+              console.log(`Reconcile: Linking offline Dexie project "${dxProject.name}" to existing Firestore project.`);
+              await db.projects.update(dxProject.id, { firestoreId: firestoreMatch.firestoreId });
+            }
+          } else {
+            // This is a new offline project, upload it.
+            console.log(`Reconcile: Uploading offline project "${dxProject.name}" to Firestore.`);
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            const { id, ...fsData } = dxProject;
+            const docRef = await addDoc(projectsCol, fsData);
+            if (dxProject.id) {
+              await db.projects.update(dxProject.id, { firestoreId: docRef.id });
+            }
+          }
+        }
+      }
+
+      // 4. Load the fully reconciled projects into state
+      await get().loadProjects();
+      console.log("Project reconciliation complete.");
+
+    } catch (error) {
+      console.error("Project reconciliation failed:", error);
+      set({ error: (error as Error).message, isLoading: false });
     }
   },
 
