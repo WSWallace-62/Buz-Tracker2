@@ -73,10 +73,17 @@ function AppContent() {
       setIsLoading(false);
     };
 
-    const unsubscribe = onAuthStateChanged(auth, initializeApp);
+    if (auth) {
+      const unsubscribe = onAuthStateChanged(auth, initializeApp);
 
+      return () => {
+        unsubscribe();
+        stopSync();
+      };
+    }
+    
+    // Fallback if auth is not ready
     return () => {
-      unsubscribe();
       stopSync();
     };
   }, [isGuest, setUser, reconcileProjects, loadSessions, loadRunningSession, startSync, stopSync, setCurrentProject]);
@@ -86,7 +93,9 @@ function AppContent() {
   };
 
   const handleLogout = async () => {
-    await signOut(auth);
+    if (auth) {
+      await signOut(auth);
+    }
     setIsGuest(false);
   };
 
