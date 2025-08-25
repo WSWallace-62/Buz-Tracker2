@@ -1,8 +1,15 @@
+// wswallace-62/buz-tracker2/Buz-Tracker2-firebase.ts-errors/src/firebase.ts
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
 import { getAuth, Auth } from "firebase/auth";
 import { getFirestore, Firestore } from "firebase/firestore";
 import { getStorage, FirebaseStorage } from "firebase/storage";
+
+// Define variables first
+export let db: Firestore | undefined = undefined;
+export let auth: Auth | undefined = undefined;
+export let storage: FirebaseStorage | undefined = undefined;
+
 
 // Your web app's Firebase configuration
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional\n
@@ -24,13 +31,10 @@ export const firebaseInitializedPromise = (async () => {
   };
 
   const app = initializeApp(firebaseConfig);
+  // Assign values after declaration
   db = getFirestore(app);
   auth = getAuth(app);
   storage = getStorage(app);
 
   // The promise resolves implicitly after the assignments
 })(); // Immediately invoke the async function
-
-export let db: Firestore | undefined = undefined;
-export let auth: Auth | undefined = undefined;
-export let storage: FirebaseStorage | undefined = undefined;
