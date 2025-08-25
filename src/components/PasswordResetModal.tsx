@@ -22,6 +22,11 @@ export function PasswordResetModal({ isOpen, onClose }: PasswordResetModalProps)
       return;
     }
 
+    if (!auth) {
+      setError('Authentication service is not available. Please try again later.');
+      return;
+    }
+
     try {
       await sendPasswordResetEmail(auth, email);
       setMessage('A password reset link has been sent to your email.');
