@@ -94,12 +94,12 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
           case 'added':
           case 'modified': {
             const projects = useProjectsStore.getState().projects;
-            const firestoreProjectId = firestoreSession.projectId as string;
+            const firestoreProjectId = (firestoreSession as any).projectId as string;
             const localProject = projects.find(p => p.firestoreId === firestoreProjectId);
 
             if (localProject && localProject.id) {
               const sessionForDexie = {
-                ...firestoreSession,
+                ...(firestoreSession as any),
                 projectId: localProject.id, // Use local numeric ID
               };
               // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -107,7 +107,7 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
 
               if (change.type === 'added' && !existingSession) {
                 console.log("Sync: Adding new session from Firestore to Dexie", firestoreSession.firestoreId);
-                await db.sessions.add(dexieData);
+                await db.sessions.add(dexieData as Session);
               } else if (change.type === 'modified' && existingSession?.id) {
                 console.log("Sync: Modifying session in Dexie from Firestore", existingSession.firestoreId);
                 await db.sessions.update(existingSession.id, dexieData);
@@ -239,7 +239,8 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
       const user = getAuth().currentUser;
       if (user && firestoreDb && session?.firestoreId) {
         // Create a separate object for Firestore updates
-        const firestoreUpdates: Partial<Session> & { projectId?: string } = { ...updates };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const firestoreUpdates: { [key: string]: any } = { ...updates };
 
         // If projectId is being updated, we need to convert the Dexie ID (number)
         // to a Firestore ID (string).
@@ -400,11 +401,12 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
         .toArray();
 
       const user = getAuth().currentUser;
-      if (user && firestoreDb) {
-        const batch = writeBatch(firestoreDb);
+      const firestoreDBInstance = firestoreDb;
+      if (user && firestoreDBInstance) {
+        const batch = writeBatch(firestoreDBInstance);
         sessionsToDelete.forEach(session => {
           if (session.firestoreId) {
-            const docRef = doc(firestoreDb, 'users', user.uid, 'sessions', session.firestoreId);
+            const docRef = doc(firestoreDBInstance, 'users', user.uid, 'sessions', session.firestoreId);
             batch.delete(docRef);
           }
         });
