@@ -9,10 +9,11 @@ export function UserProfile() {
   const [lastName, setLastName] = useState('');
   const [avatar, setAvatar] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
-  const user = auth.currentUser;
+  const user = auth?.currentUser;
 
   useEffect(() => {
-    if (user) {
+    // Check if user and db are initialized
+    if (user && db) {
       const fetchUserData = async () => {
         const userDocRef = doc(db, 'users', user.uid);
         const userDoc = await getDoc(userDocRef);
@@ -29,7 +30,8 @@ export function UserProfile() {
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file && user) {
+    // Check if file, user, and storage are initialized
+    if (file && user && storage) {
       const storageRef = ref(storage, `avatars/${user.uid}`);
       await uploadBytes(storageRef, file);
       const photoURL = await getDownloadURL(storageRef);
@@ -39,7 +41,8 @@ export function UserProfile() {
   };
 
   const handleImageDelete = async () => {
-    if (user && user.photoURL) {
+    // Check if user, photoURL, and storage are initialized
+    if (user && user.photoURL && storage) {
       const storageRef = ref(storage, `avatars/${user.uid}`);
       try {
         await deleteObject(storageRef);
@@ -52,7 +55,8 @@ export function UserProfile() {
   };
 
   const handleSave = async () => {
-    if (user) {
+    // Check if user and db are initialized
+    if (user && db) {
       const userDocRef = doc(db, 'users', user.uid);
       await setDoc(userDocRef, { firstName, lastName }, { merge: true });
       setIsEditing(false);
