@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { auth, storage, db } from '../firebase';
+import { auth, storage, db, firebaseInitializedPromise } from '../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { updateProfile } from 'firebase/auth';
@@ -9,11 +9,19 @@ export function UserProfile() {
   const [lastName, setLastName] = useState('');
   const [avatar, setAvatar] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
-  const user = auth.currentUser;
+  const user = auth?.currentUser;
 
   useEffect(() => {
+    // Check if user is available
     if (user) {
       const fetchUserData = async () => {
+        // Wait for Firebase to initialize before using db
+        await firebaseInitializedPromise;
+        if (!db) {
+          console.error("Firestore is not initialized.");
+          return;
+        }
+
         const userDocRef = doc(db, 'users', user.uid);
         const userDoc = await getDoc(userDocRef);
         if (userDoc.exists()) {
@@ -29,7 +37,9 @@ export function UserProfile() {
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file && user) {
+    // Wait for Firebase to initialize before using storage
+    await firebaseInitializedPromise;
+    if (file && user && storage) {
       const storageRef = ref(storage, `avatars/${user.uid}`);
       await uploadBytes(storageRef, file);
       const photoURL = await getDownloadURL(storageRef);
@@ -39,7 +49,9 @@ export function UserProfile() {
   };
 
   const handleImageDelete = async () => {
-    if (user && user.photoURL) {
+    // Wait for Firebase to initialize before using storage
+    await firebaseInitializedPromise;
+    if (user && user.photoURL && storage) {
       const storageRef = ref(storage, `avatars/${user.uid}`);
       try {
         await deleteObject(storageRef);
@@ -52,7 +64,9 @@ export function UserProfile() {
   };
 
   const handleSave = async () => {
-    if (user) {
+    // Wait for Firebase to initialize before using db
+    await firebaseInitializedPromise;
+    if (user && db) {
       const userDocRef = doc(db, 'users', user.uid);
       await setDoc(userDocRef, { firstName, lastName }, { merge: true });
       setIsEditing(false);
