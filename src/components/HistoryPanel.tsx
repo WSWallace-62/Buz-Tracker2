@@ -309,12 +309,13 @@ export function HistoryPanel() {
         }
 
         try {
-          if (!firestoreDB) {
+          const db = firestoreDB;
+          if (!db) {
             throw new Error("Firestore is not initialized");
           }
 
-          const projectsCol = collection(firestoreDB, 'users', user.uid, 'projects');
-          const sessionsCol = collection(firestoreDB, 'users', user.uid, 'sessions');
+          const projectsCol = collection(db, 'users', user.uid, 'projects');
+          const sessionsCol = collection(db, 'users', user.uid, 'sessions');
 
           for (const session of importedSessions) {
             const q = query(projectsCol, where("name", "==", session.projectName));
