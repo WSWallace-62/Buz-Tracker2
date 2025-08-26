@@ -46,6 +46,9 @@ interface SessionsState {
   stopSession: () => Promise<void>;
   discardRunningSession: () => Promise<void>;
   getCurrentElapsed: () => number;
+  // --- New Actions for Pause/Resume ---
+  pauseSession: () => Promise<void>;
+  resumeSession: () => Promise<void>;
 
   // Queries
   getTodaySessions: (projectId?: number) => Session[];
@@ -220,30 +223,24 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
 
   updateSession: async (id, updates) => {
     try {
-      // First, update Dexie
-      if (updates.start !== undefined || updates.stop !== undefined) {
-        const session = await db.sessions.get(id);
-        if (session) {
-          const start = updates.start ?? session.start;
-          const stop = updates.stop ?? session.stop;
-          if (stop) {
-            updates.durationMs = stop - start;
-          }
+      const session = await db.sessions.get(id);
+      if (session) {
+        const start = updates.start ?? session.start;
+        const stop = updates.stop ?? session.stop;
+        if (stop && (updates.start !== undefined || updates.stop !== undefined || updates.durationMs === undefined)) {
+          updates.durationMs = stop - start;
         }
       }
       await db.sessions.update(id, updates);
       get().loadSessions();
 
       // Then, update Firestore
-      const session = await db.sessions.get(id);
+      const updatedSession = await db.sessions.get(id);
       const user = getAuth().currentUser;
-      if (user && firestoreDb && session?.firestoreId) {
-        // Create a separate object for Firestore updates
+      if (user && firestoreDb && updatedSession?.firestoreId) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const firestoreUpdates: { [key: string]: any } = { ...updates };
 
-        // If projectId is being updated, we need to convert the Dexie ID (number)
-        // to a Firestore ID (string).
         if (updates.projectId !== undefined) {
           const projects = useProjectsStore.getState().projects;
           const project = projects.find(p => p.id === updates.projectId);
@@ -254,9 +251,9 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
         }
 
         try {
-            const sessionDocRef = doc(firestoreDb, 'users', user.uid, 'sessions', session.firestoreId);
+            const sessionDocRef = doc(firestoreDb, 'users', user.uid, 'sessions', updatedSession.firestoreId);
             // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            const { id: localId, firestoreId, ...finalUpdates } = { ...session, ...firestoreUpdates };
+            const { id: localId, firestoreId, ...finalUpdates } = { ...updatedSession, ...firestoreUpdates };
             await updateDoc(sessionDocRef, finalUpdates);
         } catch (firestoreError) {
           console.error("Error updating session in Firestore:", firestoreError);
@@ -310,7 +307,11 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
         running: true,
         projectId,
         startTs: now,
-        note
+        note,
+        // --- Initialize new fields ---
+        isPaused: false,
+        pauseStartTime: null,
+        totalPausedTime: 0,
       };
 
       await db.runningSession.clear();
@@ -338,7 +339,13 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
       }
 
       const now = Date.now();
-      const durationMs = now - running.startTs;
+      // --- Updated duration calculation ---
+      let totalPaused = running.totalPausedTime;
+      // If stopped while paused, add the last pause duration
+      if (running.isPaused && running.pauseStartTime) {
+        totalPaused += (now - running.pauseStartTime);
+      }
+      const durationMs = (now - running.startTs) - totalPaused;
 
       const newSessionData: Omit<Session, 'id' | 'createdAt' | 'firestoreId'> = {
         projectId: running.projectId,
@@ -357,10 +364,53 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
     }
   },
 
+  // --- New Pause Action ---
+  pauseSession: async () => {
+    try {
+      const running = get().runningSession;
+      if (running && !running.isPaused) {
+        const updates = { isPaused: true, pauseStartTime: Date.now() };
+        await db.runningSession.update(running.id!, updates);
+        set({ runningSession: { ...running, ...updates } });
+      }
+    } catch (error) {
+      set({ error: (error as Error).message });
+    }
+  },
+
+  // --- New Resume Action ---
+  resumeSession: async () => {
+    try {
+      const running = get().runningSession;
+      if (running && running.isPaused && running.pauseStartTime) {
+        const pausedDuration = Date.now() - running.pauseStartTime;
+        const newTotalPausedTime = running.totalPausedTime + pausedDuration;
+        const updates = {
+          isPaused: false,
+          pauseStartTime: null,
+          totalPausedTime: newTotalPausedTime,
+        };
+        await db.runningSession.update(running.id!, updates);
+        set({ runningSession: { ...running, ...updates } });
+      }
+    } catch (error) {
+      set({ error: (error as Error).message });
+    }
+  },
+
   getCurrentElapsed: () => {
     const running = get().runningSession;
     if (!running) return 0;
-    return Date.now() - running.startTs;
+    
+    // --- Updated elapsed time calculation ---
+    const elapsed = (Date.now() - running.startTs) - running.totalPausedTime;
+    // If paused, don't add the time since the last pause
+    if (running.isPaused && running.pauseStartTime) {
+      const currentPauseDuration = Date.now() - running.pauseStartTime;
+      return elapsed - currentPauseDuration;
+    }
+    
+    return elapsed;
   },
 
   getTodaySessions: (projectId) => {

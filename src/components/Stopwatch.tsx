@@ -14,31 +14,40 @@ export function Stopwatch({ projectId }: StopwatchProps) {
     startSession,
     stopSession,
     getCurrentElapsed,
-    discardRunningSession
+    discardRunningSession,
+    pauseSession,   // --- Import new action
+    resumeSession,  // --- Import new action
   } = useSessionsStore()
   
   const { showConfirm, showToast } = useUIStore()
   const [elapsed, setElapsed] = useState(0)
   const [note, setNote] = useState('')
-  const [isPaused, setIsPaused] = useState(false) // New state for pause
   const intervalRef = useRef<NodeJS.Timeout>()
   const stopwatchRef = useRef<HTMLDivElement>(null)
 
   const isRunning = runningSession?.running === true
   const isCurrentProject = runningSession?.projectId === projectId
+  // --- Derive pause state from the global store ---
+  const isPaused = isRunning && isCurrentProject && runningSession?.isPaused === true
 
   useEffect(() => {
     loadRunningSession()
   }, [loadRunningSession])
 
   useEffect(() => {
-    if (runningSession?.note) {
+    // Set note from running session, but only if it's not being edited
+    if (runningSession?.note && !isRunning) {
       setNote(runningSession.note)
+    } else if (runningSession?.note) {
+      setNote(runningSession.note)
+    } else {
+      setNote('')
     }
-  }, [runningSession])
+  }, [runningSession, isRunning])
 
   useEffect(() => {
-    if (isRunning && !isPaused) { // Only run interval if not paused
+    // --- Logic now correctly uses isPaused from the store ---
+    if (isRunning && isCurrentProject && !isPaused) {
       const updateElapsed = () => {
         setElapsed(getCurrentElapsed())
       }
@@ -55,11 +64,15 @@ export function Stopwatch({ projectId }: StopwatchProps) {
       if (intervalRef.current) {
         clearInterval(intervalRef.current)
       }
+      // Update elapsed time one last time when pausing
+      if (isRunning && isCurrentProject) {
+        setElapsed(getCurrentElapsed())
+      }
       if (!isRunning) {
         setElapsed(0)
       }
     }
-  }, [isRunning, isPaused, getCurrentElapsed])
+  }, [isRunning, isCurrentProject, isPaused, getCurrentElapsed])
 
   // Handle visibility change to recompute elapsed time
   useEffect(() => {
@@ -81,7 +94,6 @@ export function Stopwatch({ projectId }: StopwatchProps) {
 
     try {
       if (isRunning && !isCurrentProject) {
-        // Confirm switching projects
         showConfirm(
           'Switch Project?',
           'A session is already running for another project. Do you want to stop it and start a new session for this project?',
@@ -93,7 +105,6 @@ export function Stopwatch({ projectId }: StopwatchProps) {
         )
       } else {
         await startSession(projectId, note)
-        setIsPaused(false) // Reset pause state on new start
         showToast('Session started', 'success')
       }
     } catch (error) {
@@ -105,17 +116,19 @@ export function Stopwatch({ projectId }: StopwatchProps) {
     try {
       await stopSession()
       setNote('')
-      setIsPaused(false) // Reset pause state on stop
       showToast('Session ended and saved', 'success')
     } catch (error) {
       showToast((error as Error).message, 'error')
     }
   }
 
-  // --- New Pause Handler ---
-  const handlePause = () => {
-    setIsPaused(!isPaused)
-    showToast(`Timer ${!isPaused ? 'resumed' : 'paused'}`, 'info')
+  // --- Updated Pause Handler to call store actions ---
+  const handlePauseToggle = () => {
+    if (isPaused) {
+      resumeSession()
+    } else {
+      pauseSession()
+    }
   }
 
   const handleReset = () => {
@@ -127,7 +140,6 @@ export function Stopwatch({ projectId }: StopwatchProps) {
           try {
             await discardRunningSession()
             setNote('')
-            setIsPaused(false) // Reset pause state
             showToast('Session discarded', 'info')
           } catch (error) {
             showToast((error as Error).message, 'error')
@@ -201,7 +213,7 @@ export function Stopwatch({ projectId }: StopwatchProps) {
           </button>
           
           <button
-            onClick={handlePause}
+            onClick={handlePauseToggle}
             disabled={!canPause}
             className={`
               px-6 py-2 rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2

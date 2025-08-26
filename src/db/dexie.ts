@@ -27,12 +27,17 @@ export interface Settings {
   stopwatchPrecisionMs: number
 }
 
+// --- Updated RunningSession Interface ---
 export interface RunningSession {
   id?: number
   running: boolean
   projectId: number
   startTs: number
   note?: string
+  // New fields for pause functionality
+  isPaused: boolean
+  pauseStartTime: number | null
+  totalPausedTime: number
 }
 
 export class BuzTrackerDB extends Dexie {
@@ -44,11 +49,13 @@ export class BuzTrackerDB extends Dexie {
   constructor() {
     super('BuzTrackerDB')
     
-    this.version(4).stores({
+    // --- Bumped DB version from 4 to 5 ---
+    this.version(5).stores({
       projects: '++id, firestoreId, name, createdAt, archived',
       sessions: '++id, projectId, firestoreId, start, stop, createdAt, *note',
       settings: '++id',
-      runningSession: '++id'
+      // Added new fields to the runningSession table schema
+      runningSession: '++id, isPaused' 
     })
 
     this.on('ready', async () => {
