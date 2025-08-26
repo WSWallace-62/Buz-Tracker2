@@ -120,10 +120,14 @@ describe('Dexie Database', () => {
         archived: false
       }) as number
 
+      // --- FIX: Added the new required properties ---
       await db.runningSession.add({
         running: true,
         projectId,
-        startTs: Date.now()
+        startTs: Date.now(),
+        isPaused: false,
+        pauseStartTime: null,
+        totalPausedTime: 0
       })
 
       const runningSession = await db.runningSession.toCollection().first()
