@@ -17,5 +17,21 @@ export default defineConfig({
   server: {
     cors: true,
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Split firebase into smaller chunks
+          'firebase-app': ['firebase/app'],
+          'firebase-auth': ['firebase/auth'],
+          'firebase-firestore': ['firebase/firestore'],
+          'firebase-storage': ['firebase/storage'],
+          dexie: ['dexie', 'dexie-react-hooks'],
+          react: ['react', 'react-dom', 'react-router-dom'],
+          chartjs: ['chart.js', 'react-chartjs-2'],
+        },
+      },
+    },
+  },
 })
 
