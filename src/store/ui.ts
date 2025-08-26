@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { db } from '../db/dexie' // Keep the static import
 
 interface ToastState {
   id: string
@@ -11,7 +12,6 @@ interface ToastState {
 }
 
 interface UIState {
-  // Modal states
   isProjectManagerOpen: boolean
   isAddEntryModalOpen: boolean
   confirmDialog: {
@@ -21,45 +21,29 @@ interface UIState {
     onConfirm: () => void
     onCancel?: () => void
   } | null
-  
-  // Toast system
   toasts: ToastState[]
-  
-  // Settings
   currentProjectId: number | null
   theme: 'light' | 'dark'
-  
-  // Actions
   openProjectManager: () => void
   closeProjectManager: () => void
-  
   openAddEntryModal: () => void
   closeAddEntryModal: () => void
-  
   showConfirm: (title: string, message: string, onConfirm: () => void, onCancel?: () => void) => void
   hideConfirm: () => void
-  
   showToast: (message: string, type?: 'success' | 'error' | 'info', action?: { label: string; onClick: () => void }) => void
   removeToast: (id: string) => void
-  
   setCurrentProject: (projectId: number | null) => void
   setTheme: (theme: 'light' | 'dark') => void
 }
 
 export const useUIStore = create<UIState>((set, get) => ({
-  // Modal states
   isProjectManagerOpen: false,
   isAddEntryModalOpen: false,
   confirmDialog: null,
-  
-  // Toast system
   toasts: [],
-  
-  // Settings
   currentProjectId: null,
   theme: 'light',
   
-  // Actions
   openProjectManager: () => set({ isProjectManagerOpen: true }),
   closeProjectManager: () => set({ isProjectManagerOpen: false }),
   
@@ -81,50 +65,45 @@ export const useUIStore = create<UIState>((set, get) => ({
   hideConfirm: () => set({ confirmDialog: null }),
   
   showToast: (message, type = 'info', action) => {
-    const id = Math.random().toString(36).substr(2, 9)
-    const toast: ToastState = { id, message, type, action }
+    const id = Math.random().toString(36).substr(2, 9);
+    const toast: ToastState = { id, message, type, action };
     
     set(state => ({
       toasts: [...state.toasts, toast]
-    }))
+    }));
     
-    // Auto remove after 5 seconds unless it has an action
     if (!action) {
       setTimeout(() => {
-        get().removeToast(id)
-      }, 5000)
+        get().removeToast(id);
+      }, 5000);
     }
   },
   
   removeToast: (id) => {
     set(state => ({
       toasts: state.toasts.filter(t => t.id !== id)
-    }))
+    }));
   },
   
-  setCurrentProject: (projectId) => {
-    set({ currentProjectId: projectId })
-    // Persist to settings
+  // FIX: Added the parameter types back
+  setCurrentProject: (projectId: number | null) => {
+    set({ currentProjectId: projectId });
     if (projectId) {
-      import('../db/dexie').then(({ db }) => {
-        db.settings.toCollection().first().then(settings => {
-          if (settings) {
-            db.settings.update(settings.id!, { lastProjectId: projectId })
-          }
-        })
-      })
+      db.settings.toCollection().first().then(settings => {
+        if (settings) {
+          db.settings.update(settings.id!, { lastProjectId: projectId });
+        }
+      });
     }
   },
   
-  setTheme: (theme) => {
-    set({ theme })
-    // Persist to settings
-    import('../db/dexie').then(({ db }) => {
-      db.settings.toCollection().first().then(settings => {
-        if (settings) {
-          db.settings.update(settings.id!, { theme })
-        }
-      })
-    })
+  // FIX: Added the parameter types back
+  setTheme: (theme: 'light' | 'dark') => {
+    set({ theme });
+    db.settings.toCollection().first().then(settings => {
+      if (settings) {
+        db.settings.update(settings.id!, { theme });
+      }
+    });
   }
-}))
+}));
