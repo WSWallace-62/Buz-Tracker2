@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react'
 import { useSessionsStore } from '../store/sessions'
 import { useProjectsStore } from '../store/projects'
 import { useUIStore } from '../store/ui'
-import { formatTime, formatDurationHHMM, isToday, formatDate } from '../utils/time'
+// --- Import the new parseDurationToMs function ---
+import { formatTime, formatDurationHHMM, isToday, formatDate, createTimeRange, parseDurationToMs } from '../utils/time'
 import { Session } from '../db/dexie'
 
 interface SessionsTableProps {
@@ -41,14 +42,12 @@ export function SessionsTable({ projectId, showAllProjects = false, sessions: ex
       async () => {
         await deleteSession(session.id!)
         
-        // Show undo option
         showToast(
           'Session deleted',
           'success',
           {
             label: 'Undo',
             onClick: async () => {
-              // Re-create the session
               await useSessionsStore.getState().createSession({
                 projectId: session.projectId,
                 start: session.start,
@@ -219,7 +218,36 @@ function EditSessionModal({ session, onClose }: EditSessionModalProps) {
   const [projectId, setProjectId] = useState(session.projectId)
   const [startTime, setStartTime] = useState(formatTime(session.start))
   const [stopTime, setStopTime] = useState(session.stop ? formatTime(session.stop) : '')
+  const [duration, setDuration] = useState(formatDurationHHMM(session.durationMs))
   const [note, setNote] = useState(session.note || '')
+
+  // --- Logic to keep fields in sync ---
+  useEffect(() => {
+    try {
+      if (startTime && stopTime) {
+        const range = createTimeRange(formatDate(session.start), startTime, stopTime)
+        setDuration(formatDurationHHMM(range.duration))
+      }
+    } catch {
+      setDuration('')
+    }
+  }, [startTime, stopTime, session.start])
+
+  const handleDurationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newDurationStr = e.target.value
+    setDuration(newDurationStr)
+
+    try {
+      const durationMs = parseDurationToMs(newDurationStr)
+      if (durationMs >= 0 && startTime) {
+        const startMs = createTimeRange(formatDate(session.start), startTime, '23:59').start
+        const newStopMs = startMs + durationMs
+        setStopTime(formatTime(newStopMs))
+      }
+    } catch {
+      // Ignore parsing errors while user is typing
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -257,7 +285,7 @@ function EditSessionModal({ session, onClose }: EditSessionModalProps) {
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
       onClose()
-    } else if (e.key === 'Enter' && e.ctrlKey) {
+    } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
       handleSubmit(e as any)
     }
   }
@@ -286,27 +314,43 @@ function EditSessionModal({ session, onClose }: EditSessionModalProps) {
             </select>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Start Time
-            </label>
-            <input
-              type="time"
-              value={startTime}
-              onChange={(e) => setStartTime(e.target.value)}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Start Time
+              </label>
+              <input
+                type="time"
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Stop Time
+              </label>
+              <input
+                type="time"
+                value={stopTime}
+                onChange={(e) => setStopTime(e.target.value)}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
           </div>
 
+          {/* --- New Duration Field --- */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Stop Time
+              Duration (HH:MM)
             </label>
             <input
-              type="time"
-              value={stopTime}
-              onChange={(e) => setStopTime(e.target.value)}
+              type="text"
+              value={duration}
+              onChange={handleDurationChange}
+              placeholder="e.g., 1:30"
               className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>

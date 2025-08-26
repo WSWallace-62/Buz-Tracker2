@@ -9,6 +9,28 @@ dayjs.extend(timezone)
 dayjs.extend(isoWeek)
 dayjs.extend(customParseFormat)
 
+// --- Add this new function ---
+export function parseDurationToMs(durationStr: string): number {
+  const parts = durationStr.split(':').map(Number)
+  if (parts.some(isNaN)) {
+    return 0
+  }
+
+  let hours = 0, minutes = 0, seconds = 0
+
+  if (parts.length === 2) {
+    [hours, minutes] = parts
+  } else if (parts.length === 3) {
+    [hours, minutes, seconds] = parts
+  } else if (parts.length === 1) {
+    [minutes] = parts
+  } else {
+    return 0
+  }
+
+  return (hours * 3600 + minutes * 60 + seconds) * 1000
+}
+
 export function formatDuration(ms: number): string {
   const totalSeconds = Math.floor(ms / 1000)
   const hours = Math.floor(totalSeconds / 3600)
@@ -27,6 +49,7 @@ export function formatDurationHours(ms: number): string {
 }
 
 export function formatDurationHHMM(ms: number): string {
+  if (ms < 0) return '0:00'
   const totalMinutes = Math.floor(ms / (1000 * 60))
   const hours = Math.floor(totalMinutes / 60)
   const minutes = totalMinutes % 60
@@ -124,6 +147,10 @@ export function getTotalDuration(sessions: Array<{ durationMs: number }>): numbe
 }
 
 export function createTimeRange(date: string, startTime: string, endTime: string) {
+  if (!startTime || !endTime) {
+    throw new Error("Start and end times are required");
+  }
+  
   const baseDate = dayjs(date).valueOf()
   const start = parseTimeInput(startTime, baseDate)
   const end = parseTimeInput(endTime, baseDate)
