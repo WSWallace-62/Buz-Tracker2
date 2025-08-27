@@ -116,7 +116,7 @@ export function SessionsTable({ projectId, showAllProjects = false, sessions: ex
                 Start
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Stop
+                End
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Duration
@@ -221,64 +221,57 @@ function EditSessionModal({ session, onClose }: EditSessionModalProps) {
   const [duration, setDuration] = useState(formatDurationHHMM(session.durationMs))
   const [note, setNote] = useState(session.note || '')
 
-  // --- Logic to keep fields in sync ---
+  // Recalculate stop time whenever start time or duration changes
   useEffect(() => {
     try {
-      if (startTime && stopTime) {
-        const range = createTimeRange(formatDate(session.start), startTime, stopTime)
-        setDuration(formatDurationHHMM(range.duration))
-      }
-    } catch {
-      setDuration('')
-    }
-  }, [startTime, stopTime, session.start])
-
-  const handleDurationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newDurationStr = e.target.value
-    setDuration(newDurationStr)
-
-    try {
-      const durationMs = parseDurationToMs(newDurationStr)
+      const durationMs = parseDurationToMs(duration);
       if (durationMs >= 0 && startTime) {
-        const startMs = createTimeRange(formatDate(session.start), startTime, '23:59').start
-        const newStopMs = startMs + durationMs
-        setStopTime(formatTime(newStopMs))
+        const startMs = createTimeRange(formatDate(session.start), startTime, '23:59').start;
+        const newStopMs = startMs + durationMs;
+        setStopTime(formatTime(newStopMs));
       }
     } catch {
       // Ignore parsing errors while user is typing
+      setStopTime('');
     }
+  }, [startTime, duration, session.start]);
+
+  const handleDurationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setDuration(e.target.value)
+  }
+
+  const handleStartTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setStartTime(e.target.value)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
     try {
+      const durationMs = parseDurationToMs(duration)
+      if (durationMs < 0) {
+        showToast('Duration must be a positive value', 'error')
+        return
+      }
+
       const startDate = new Date(session.start)
       const [startHour, startMin] = startTime.split(':').map(Number)
       const newStart = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate(), startHour, startMin).getTime()
       
-      let newStop: number | null = null
-      if (stopTime) {
-        const [stopHour, stopMin] = stopTime.split(':').map(Number)
-        newStop = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate(), stopHour, stopMin).getTime()
-        
-        if (newStop <= newStart) {
-          showToast('Stop time must be after start time', 'error')
-          return
-        }
-      }
+      const newStop = newStart + durationMs
 
       await updateSession(session.id!, {
         projectId,
         start: newStart,
         stop: newStop,
+        durationMs,
         note: note || undefined
       })
       
       showToast('Session updated', 'success')
       onClose()
     } catch (error) {
-      showToast('Failed to update session', 'error')
+      showToast((error as Error).message, 'error')
     }
   }
 
@@ -322,7 +315,7 @@ function EditSessionModal({ session, onClose }: EditSessionModalProps) {
               <input
                 type="time"
                 value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
+                onChange={handleStartTimeChange}
                 className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 required
               />
@@ -330,13 +323,13 @@ function EditSessionModal({ session, onClose }: EditSessionModalProps) {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Stop Time
+                End Time
               </label>
               <input
                 type="time"
                 value={stopTime}
-                onChange={(e) => setStopTime(e.target.value)}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                readOnly
+                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-100"
               />
             </div>
           </div>
