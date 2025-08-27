@@ -196,12 +196,12 @@ export function Stopwatch({ projectId }: StopwatchProps) {
           rows={2}
           disabled={isRunning}
         />
-        <div className="flex justify-center space-x-3">
+        <div className="flex justify-center space-x-2 sm:space-x-3">
           <button
             onClick={handleStart}
             disabled={!canStart}
             className={`
-              px-6 py-2 rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2
+              px-4 sm:px-6 py-2 rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2
               ${canStart
                 ? 'bg-green-600 text-white hover:bg-green-700 focus:ring-green-500'
                 : 'bg-gray-300 text-gray-500 cursor-not-allowed'
@@ -216,7 +216,7 @@ export function Stopwatch({ projectId }: StopwatchProps) {
             onClick={handlePauseToggle}
             disabled={!canPause}
             className={`
-              px-6 py-2 rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2
+              px-4 sm:px-6 py-2 rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2
               ${canPause
                 ? isPaused 
                   ? 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500' 
@@ -224,15 +224,15 @@ export function Stopwatch({ projectId }: StopwatchProps) {
                 : 'bg-gray-300 text-gray-500 cursor-not-allowed'
               }
             `}
-            aria-label={isPaused ? "Continue timer" : "Pause timer"}
+            aria-label={isPaused ? "Resume timer" : "Pause timer"}
           >
-            {isPaused ? 'Continue' : 'Pause'}
+            {isPaused ? 'Resume' : 'Pause'}
           </button>
 
           <button
             onClick={handleReset}
             className={`
-              px-6 py-2 rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2
+              px-4 sm:px-6 py-2 rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2
               bg-gray-600 text-white hover:bg-gray-700 focus:ring-gray-500
             `}
             aria-label="Reset timer"
@@ -244,7 +244,7 @@ export function Stopwatch({ projectId }: StopwatchProps) {
             onClick={handleEnd}
             disabled={!canEnd}
             className={`
-              px-6 py-2 rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2
+              px-4 sm:px-6 py-2 rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2
               ${canEnd
                 ? 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500'
                 : 'bg-gray-300 text-gray-500 cursor-not-allowed'

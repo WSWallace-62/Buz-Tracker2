@@ -144,7 +144,7 @@ function AppContent() {
               {(user || isGuest) && (
                 <button
                   onClick={handleLogout}
-                  className="px-3 py-1.5 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700"
+                  className="px-3 py-1.5 text-sm font-medium text-gray-800 bg-gray-300 rounded-md hover:bg-gray-400"
                 >
                   Logout
                 </button>
