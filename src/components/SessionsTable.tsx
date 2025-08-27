@@ -116,7 +116,7 @@ export function SessionsTable({ projectId, showAllProjects = false, sessions: ex
                 Start
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Stop
+                End
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Duration
@@ -323,7 +323,7 @@ function EditSessionModal({ session, onClose }: EditSessionModalProps) {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Stop Time
+                End Time
               </label>
               <input
                 type="time"
