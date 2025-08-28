@@ -1,3 +1,4 @@
+// wswallace-62/buz-tracker2/Buz-Tracker2-Github-errors/src/App.tsx
 import { useEffect, useState, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
@@ -139,9 +140,11 @@ function AppContent() {
                   </svg>
                 </div>
               )}
-              <div className="ml-4 text-sm text-gray-600">
-                Today: {formatDurationHHMM(todayTotal)}
-              </div>
+              {activeTab === 'tracker' && (
+                <div className="ml-4 text-sm text-gray-600">
+                  Today: {formatDurationHHMM(todayTotal)}
+                </div>
+              )}
             </div>
             
             <div className="flex items-center space-x-4">

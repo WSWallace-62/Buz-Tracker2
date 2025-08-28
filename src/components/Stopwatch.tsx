@@ -1,3 +1,4 @@
+// wswallace-62/buz-tracker2/Buz-Tracker2-Github-errors/src/components/Stopwatch.tsx
 import React, { useEffect, useState, useRef } from 'react'
 import { useSessionsStore } from '../store/sessions'
 import { useUIStore } from '../store/ui'
@@ -262,7 +263,7 @@ export function Stopwatch({ projectId }: StopwatchProps) {
           </p>
         )}
 
-        <p className="mt-2 text-xs text-gray-500">
+        <p className="mt-2 text-xs text-gray-500 hidden sm:block">
           Press Space to {canEnd ? 'end' : 'start'}
         </p>
       </div>
