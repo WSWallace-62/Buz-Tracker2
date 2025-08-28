@@ -1,8 +1,8 @@
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc } from "firebase/firestore";
-// 1. Corrected import path and added firebaseInitializedPromise
-import { db, firebaseInitializedPromise } from "../firebase";
+// wswallace-62/buz-tracker2/Buz-Tracker2-Github-errors/src/db/projects.ts
 
-// Your Project interface (this part was already correct)
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc } from "firebase/firestore";
+import { db } from "../firebase";
+
 export interface Project {
   id: string;
   name: string;
@@ -11,43 +11,34 @@ export interface Project {
   archived: boolean;
 }
 
-// Get all projects
-export const getProjects = async (): Promise<Project[]> => {
-  // 2. Wait for initialization
-  await firebaseInitializedPromise;
-  // 3. Add a type guard to prove to TypeScript that db is ready
+// Helper to get the user-specific projects collection
+const getProjectsCollection = (userId: string) => {
   if (!db) throw new Error("Firestore is not initialized");
+  return collection(db, `users/${userId}/projects`);
+};
 
-  // 4. Define the collection reference inside the function
-  const projectsCollection = collection(db, "projects");
-  const snapshot = await getDocs(projectsCollection);
+// Get all projects for a user
+export const getProjects = async (userId: string): Promise<Project[]> => {
+  const snapshot = await getDocs(getProjectsCollection(userId));
   return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Project));
 };
 
-// Add a new project
-export const addProject = async (project: Omit<Project, 'id'>) => {
-  await firebaseInitializedPromise;
-  if (!db) throw new Error("Firestore is not initialized");
-
-  const projectsCollection = collection(db, "projects");
-  const docRef = await addDoc(projectsCollection, project);
+// Add a new project for a user
+export const addProject = async (userId: string, project: Omit<Project, 'id'>) => {
+  const docRef = await addDoc(getProjectsCollection(userId), project);
   return { ...project, id: docRef.id };
 };
 
-// Update an existing project
-export const updateProject = async (id: string, updates: Partial<Project>) => {
-  await firebaseInitializedPromise;
+// Update an existing project for a user
+export const updateProject = async (userId: string, id: string, updates: Partial<Project>) => {
   if (!db) throw new Error("Firestore is not initialized");
-
-  const projectDoc = doc(db, "projects", id);
+  const projectDoc = doc(db, `users/${userId}/projects`, id);
   await updateDoc(projectDoc, updates);
 };
 
-// Delete a project
-export const deleteProject = async (id: string) => {
-  await firebaseInitializedPromise;
+// Delete a project for a user
+export const deleteProject = async (userId: string, id: string) => {
   if (!db) throw new Error("Firestore is not initialized");
-
-  const projectDoc = doc(db, "projects", id);
+  const projectDoc = doc(db, `users/${userId}/projects`, id);
   await deleteDoc(projectDoc);
 };

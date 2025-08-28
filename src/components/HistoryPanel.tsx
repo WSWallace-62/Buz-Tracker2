@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db as dexieDB } from '../db/dexie'
-import { db as firestoreDB, firebaseInitializedPromise } from '../firebase'
+import { db as firestoreDB } from '../firebase'
 import { collection, addDoc, getDocs, query, where } from 'firebase/firestore'
 import { useSessionsStore } from '../store/sessions'
 import { useProjectsStore } from '../store/projects'
@@ -265,8 +265,6 @@ export function HistoryPanel() {
       showToast('No file selected', 'error')
       return
     }
-
-    await firebaseInitializedPromise
 
     Papa.parse(file, {
       header: true,

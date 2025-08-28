@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { auth, storage, db, firebaseInitializedPromise } from '../firebase';
+import { auth, storage, db } from '../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { updateProfile } from 'firebase/auth';
@@ -12,11 +12,8 @@ export function UserProfile() {
   const user = auth?.currentUser;
 
   useEffect(() => {
-    // Check if user is available
     if (user) {
       const fetchUserData = async () => {
-        // Wait for Firebase to initialize before using db
-        await firebaseInitializedPromise;
         if (!db) {
           console.error("Firestore is not initialized.");
           return;
@@ -37,8 +34,6 @@ export function UserProfile() {
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    // Wait for Firebase to initialize before using storage
-    await firebaseInitializedPromise;
     if (file && user && storage) {
       const storageRef = ref(storage, `avatars/${user.uid}`);
       await uploadBytes(storageRef, file);
@@ -49,8 +44,6 @@ export function UserProfile() {
   };
 
   const handleImageDelete = async () => {
-    // Wait for Firebase to initialize before using storage
-    await firebaseInitializedPromise;
     if (user && user.photoURL && storage) {
       const storageRef = ref(storage, `avatars/${user.uid}`);
       try {
@@ -64,8 +57,6 @@ export function UserProfile() {
   };
 
   const handleSave = async () => {
-    // Wait for Firebase to initialize before using db
-    await firebaseInitializedPromise;
     if (user && db) {
       const userDocRef = doc(db, 'users', user.uid);
       await setDoc(userDocRef, { firstName, lastName }, { merge: true });

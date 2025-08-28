@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { db, Project } from '../db/dexie'
-import { db as firestoreDB, firebaseInitializedPromise } from '../firebase'
+import { db as firestoreDB } from '../firebase'
 import { collection, addDoc, doc, updateDoc, deleteDoc, getDocs } from 'firebase/firestore'
 import { useAuthStore } from './auth'
 
@@ -41,7 +41,6 @@ export const useProjectsStore = create<ProjectsState>((set, get) => ({
     }
 
     try {
-      await firebaseInitializedPromise;
       if (!firestoreDB) throw new Error("Firestore not initialized");
 
       // 1. Save to Firestore to get the firestoreId
@@ -137,7 +136,6 @@ export const useProjectsStore = create<ProjectsState>((set, get) => ({
     console.log("Reconciling projects...");
 
     try {
-      await firebaseInitializedPromise;
       if (!firestoreDB) throw new Error("Firestore not initialized");
 
       const projectsCol = collection(firestoreDB, 'users', user.uid, 'projects');
