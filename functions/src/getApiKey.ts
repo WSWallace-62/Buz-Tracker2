@@ -1,5 +1,5 @@
 import * as functions from "firebase-functions";
-import {SecretManagerServiceClient} from "@google-cloud/secret-manager";
+import { SecretManagerServiceClient } from "@google-cloud/secret-manager";
 import cors from "cors"; // <-- FIX 1: Use a default import
 
 const client = new SecretManagerServiceClient();
@@ -10,7 +10,7 @@ const corsHandler = cors({ origin: true });
 
 // It's safer to get the project ID dynamically
 const secretName = `projects/${process.env.GCLOUD_PROJECT}/secrets/` +
-  `buztracker-project-key/versions/latest`;
+  "buztracker-project-key/versions/latest";
 
 export const getApiKey = functions.https.onRequest(async (req, res) => {
   // FIX 2: Use the initialized cors handler

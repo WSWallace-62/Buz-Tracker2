@@ -255,7 +255,6 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
       const updatedSession = await db.sessions.get(id);
       const user = getAuth().currentUser;
       if (user && firestoreDb && updatedSession?.firestoreId) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const firestoreUpdates: { [key: string]: any } = { ...updates };
 
         if (updates.projectId !== undefined) {
