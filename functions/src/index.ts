@@ -7,7 +7,7 @@
  * See a full list of supported triggers at https://firebase.google.com/docs/functions
  */
 
-import {setGlobalOptions} from "firebase-functions";
+import { setGlobalOptions } from "firebase-functions";
 // Start writing functions
 // https://firebase.google.com/docs/functions/typescript
 
@@ -21,8 +21,8 @@ import {setGlobalOptions} from "firebase-functions";
 // functions should each use functions.runWith({ maxInstances: 10 }) instead.
 // In the v1 API, each function can only serve one request per container, so
 // this will be the maximum concurrent request count.
-setGlobalOptions({maxInstances: 10}); // Default to 10 for cold start
+setGlobalOptions({ maxInstances: 10 }); // Default to 10 for cold start
 
-import {getApiKey} from "./getApiKey";
+import { getApiKey } from "./getApiKey";
 
 export { getApiKey };
