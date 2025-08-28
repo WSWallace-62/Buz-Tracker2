@@ -1,0 +1,13 @@
+# Build artifacts
+/dist
+/build
+
+# Dependencies
+/node_modules
+
+# Firebase Functions project
+/functions
+
+# Config files that shouldn't be linted
+.eslintrc.cjs
+vite.config.ts
