@@ -1,13 +1,30 @@
-// .eslintrc.cjs
+// wswallace-62/buz-tracker2/Buz-Tracker2-more/.eslintrc.cjs
 module.exports = {
+  root: true, // <-- Good practice to add this
   parser: '@typescript-eslint/parser',
   plugins: ['@typescript-eslint'],
   extends: [
     'eslint:recommended',
     'plugin:@typescript-eslint/recommended',
+    'plugin:react-hooks/recommended', // <-- Added for React hooks best practices
+  ],
+  // This is the critical addition:
+  ignorePatterns: [
+    'dist',
+    '.eslintrc.cjs',
+    'vite.config.ts',
+    'functions/**/*', // <-- This line tells the root linter to skip the functions folder
   ],
   rules: {
-    // CI is failing on "Unexpected any" and warnings are treated as errors.
     '@typescript-eslint/no-explicit-any': 'off',
   },
+  settings: {
+    react: {
+      version: 'detect', // <-- Helps ESLint understand your React version
+    },
+  },
+  env: { // <-- Add environment info
+    browser: true,
+    es2020: true
+  }
 };
