@@ -120,7 +120,6 @@ describe('Dexie Database', () => {
         archived: false
       }) as number
 
-      // --- FIX: Added the new required properties ---
       await db.runningSession.add({
         running: true,
         projectId,

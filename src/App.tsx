@@ -50,23 +50,24 @@ function AppContent() {
   useEffect(() => {
     const initializeApp = async (currentUser: User | null) => {
       setUser(currentUser);
+      setIsLoading(true);
+
       if (currentUser) {
+        setIsGuest(false);
         await reconcileProjects();
-        await loadRunningSession();
         startSync();
       } else if (isGuest) {
-        await Promise.all([
-          reconcileProjects(),
-          loadSessions(),
-          loadRunningSession(),
-        ]);
+        await loadSessions();
       }
-      if(currentUser || isGuest) {
+      
+      if (currentUser || isGuest) {
+        await loadRunningSession();
         const settings = await db.settings.toCollection().first();
         if (settings?.lastProjectId) {
           setCurrentProject(settings.lastProjectId);
         }
       }
+
       setIsLoading(false);
     };
 
@@ -76,6 +77,9 @@ function AppContent() {
         unsubscribe();
         stopSync();
       };
+    } else {
+      // Handle case where auth is not available (e.g., guest mode from start)
+      initializeApp(null);
     }
     
     return () => {
@@ -91,6 +95,7 @@ function AppContent() {
     if (auth) {
       await signOut(auth);
     }
+    setUser(null);
     setIsGuest(false);
   };
 
