@@ -1,8 +1,13 @@
+// wswallace-62/buz-tracker2/Buz-Tracker2-Logouts-still-happening/src/firebase.ts
 // src/firebase.ts
 import { initializeApp } from "firebase/app";
-import { getAuth, Auth, setPersistence, browserLocalPersistence } from "firebase/auth";
 import { getFirestore, Firestore } from "firebase/firestore";
 import { getStorage, FirebaseStorage } from "firebase/storage";
+import {
+  initializeAuth,
+  indexedDBLocalPersistence,
+  Auth,
+} from "firebase/auth";
 
 // Get Firebase config from Vite environment variables
 const firebaseConfig = {
@@ -19,14 +24,11 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 
 // Initialize services
-export const auth: Auth = getAuth(app);
+// FIX: Initialize Auth with explicit persistence to avoid race conditions
+// and ensure the session is stored in IndexedDB for long-term persistence.
+export const auth: Auth = initializeAuth(app, {
+  persistence: indexedDBLocalPersistence,
+});
+
 export const db: Firestore = getFirestore(app);
 export const storage: FirebaseStorage = getStorage(app);
-
-// Set persistence to 'local' to keep the user signed in across browser sessions.
-// This is the default, but we're making it explicit to ensure consistency.
-setPersistence(auth, browserLocalPersistence)
-  .catch((error) => {
-    // Handle errors here, such as when the user's browser blocks third-party cookies.
-    console.error("Could not set auth persistence:", error);
-  });
