@@ -1,5 +1,5 @@
-// wswallace-62/buz-tracker2/Buz-Tracker2-Github-errors/src/App.tsx
-import { useEffect, useState, lazy, Suspense } from 'react';
+// wswallace-62/buz-tracker2/Buz-Tracker2-Logouts-still-happening/src/App.tsx
+import { useEffect, useState, lazy, Suspense, useCallback } from 'react';
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
 import { useProjectsStore } from './store/projects';
@@ -48,45 +48,45 @@ function AppContent() {
 
   const activeTab: Tab = location.pathname === '/history' ? 'history' : location.pathname === '/settings' ? 'settings' : 'tracker';
 
-  useEffect(() => {
-    const initializeApp = async (currentUser: User | null) => {
-      setUser(currentUser);
-      setIsLoading(true);
+  // FIX: Memoize initializeApp with useCallback to stabilize the function reference
+  // This prevents the main useEffect from re-running unnecessarily.
+  const initializeApp = useCallback(async (currentUser: User | null) => {
+    setUser(currentUser);
+    setIsLoading(true);
 
-      if (currentUser) {
-        setIsGuest(false);
-        await reconcileProjects();
-        startSync();
-      } else if (isGuest) {
-        await loadSessions();
-      }
-      
-      if (currentUser || isGuest) {
-        await loadRunningSession();
-        const settings = await db.settings.toCollection().first();
-        if (settings?.lastProjectId) {
-          setCurrentProject(settings.lastProjectId);
-        }
-      }
-
-      setIsLoading(false);
-    };
-
-    if (auth) {
-      const unsubscribe = onAuthStateChanged(auth, initializeApp);
-      return () => {
-        unsubscribe();
-        stopSync();
-      };
-    } else {
-      // Handle case where auth is not available (e.g., guest mode from start)
-      initializeApp(null);
+    if (currentUser) {
+      setIsGuest(false);
+      await reconcileProjects();
+      startSync();
+    } else if (isGuest) {
+      // For guest users, we only need to load local sessions.
+      await loadSessions();
     }
     
-    return () => {
-      stopSync();
-    };
+    // This logic should run for both authenticated users and guests.
+    if (currentUser || isGuest) {
+      await loadRunningSession();
+      const settings = await db.settings.toCollection().first();
+      if (settings?.lastProjectId) {
+        setCurrentProject(settings.lastProjectId);
+      }
+    }
+
+    setIsLoading(false);
   }, [isGuest, setUser, reconcileProjects, loadSessions, loadRunningSession, startSync, stopSync, setCurrentProject]);
+
+  // FIX: This useEffect should only run ONCE to set up the auth listener.
+  // The logic inside initializeApp will handle all subsequent state changes.
+  useEffect(() => {
+    // onAuthStateChanged returns an unsubscribe function that should be called on cleanup.
+    const unsubscribe = onAuthStateChanged(auth, initializeApp);
+    
+    // The cleanup function will be called when the component unmounts.
+    return () => {
+      unsubscribe();
+      stopSync(); // Also ensure sync is stopped on unmount.
+    };
+  }, [initializeApp, stopSync]); // Dependencies are now stable.
 
   const handleLogin = () => {
     setIsGuest(true);
@@ -96,6 +96,7 @@ function AppContent() {
     if (auth) {
       await signOut(auth);
     }
+    // Reset the user state and guest status upon logout.
     setUser(null);
     setIsGuest(false);
   };
