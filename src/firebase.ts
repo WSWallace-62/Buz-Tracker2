@@ -1,6 +1,6 @@
 // src/firebase.ts
 import { initializeApp } from "firebase/app";
-import { getAuth, Auth } from "firebase/auth";
+import { getAuth, Auth, setPersistence, browserLocalPersistence } from "firebase/auth";
 import { getFirestore, Firestore } from "firebase/firestore";
 import { getStorage, FirebaseStorage } from "firebase/storage";
 
@@ -23,10 +23,10 @@ export const auth: Auth = getAuth(app);
 export const db: Firestore = getFirestore(app);
 export const storage: FirebaseStorage = getStorage(app);
 
-// Create a promise that resolves when auth state is first determined
-export const firebaseInitializedPromise = new Promise<void>((resolve) => {
-  const unsubscribe = auth.onAuthStateChanged(() => {
-    unsubscribe();
-    resolve();
+// Set persistence to 'local' to keep the user signed in across browser sessions.
+// This is the default, but we're making it explicit to ensure consistency.
+setPersistence(auth, browserLocalPersistence)
+  .catch((error) => {
+    // Handle errors here, such as when the user's browser blocks third-party cookies.
+    console.error("Could not set auth persistence:", error);
   });
-});
