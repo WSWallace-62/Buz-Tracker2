@@ -69,18 +69,18 @@ function AppContent() {
     }
 
     setIsLoading(false);
-  // FIX: Removed stopSync from the dependency array as it's a stable function from Zustand
   }, [isGuest, setUser, reconcileProjects, loadSessions, loadRunningSession, startSync, setCurrentProject]);
 
+  // FIX: This useEffect should only run ONCE to set up the auth listener.
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, initializeApp);
     
+    // The cleanup function will be called when the component unmounts.
     return () => {
       unsubscribe();
-      stopSync();
+      stopSync(); // This line uses stopSync...
     };
-  // FIX: Removed stopSync from this dependency array as well.
-  }, [initializeApp]);
+  }, [initializeApp, stopSync]); // ...so it MUST be included here.
 
   const handleLogin = () => {
     setIsGuest(true);
