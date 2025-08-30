@@ -1,9 +1,28 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Users can only read and write their own data.
-    match /users/{userId}/{document=**} {
+    match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
+
+      // Allow users to manage their own projects and sessions
+      match /projects/{projectId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+
+        match /sessions/{sessionId} {
+          allow read, write: if request.auth != null && request.auth.uid == userId;
+        }
+      }
+    }
+  }
+}
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Allow authenticated users to upload their own avatars
+    match /avatars/{userId} {
+      allow write: if request.auth != null && request.auth.uid == userId;
+      allow read: if true; // Public read access for avatars
     }
   }
 }

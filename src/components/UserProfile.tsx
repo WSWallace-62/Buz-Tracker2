@@ -36,10 +36,14 @@ export function UserProfile() {
     const file = event.target.files?.[0];
     if (file && user && storage) {
       const storageRef = ref(storage, `avatars/${user.uid}`);
-      await uploadBytes(storageRef, file);
-      const photoURL = await getDownloadURL(storageRef);
-      await updateProfile(user, { photoURL });
-      setAvatar(photoURL);
+      try {
+        await uploadBytes(storageRef, file);
+        const photoURL = await getDownloadURL(storageRef);
+        await updateProfile(user, { photoURL });
+        setAvatar(photoURL);
+      } catch (error) {
+        console.error("Error uploading image:", error);
+      }
     }
   };
 
