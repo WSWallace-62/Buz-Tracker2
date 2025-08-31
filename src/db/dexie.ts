@@ -55,7 +55,7 @@ export class BuzTrackerDB extends Dexie {
       sessions: '++id, projectId, firestoreId, start, stop, createdAt, *note',
       settings: '++id',
       // Added new fields to the runningSession table schema
-      runningSession: '++id, isPaused' 
+      runningSession: '++id, running, projectId, startTs, isPaused' 
     })
 
     this.on('ready', async () => {
