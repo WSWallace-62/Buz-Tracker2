@@ -2,7 +2,7 @@
 import React, { useEffect, useState, useRef } from 'react'
 import { useSessionsStore } from '../store/sessions'
 import { useUIStore } from '../store/ui'
-import { formatDuration } from '../utils/time'
+import { formatDuration, formatDate, formatTime } from '../utils/time'
 
 interface StopwatchProps {
   projectId: number | null
@@ -16,8 +16,8 @@ export function Stopwatch({ projectId }: StopwatchProps) {
     stopSession,
     getCurrentElapsed,
     discardRunningSession,
-    pauseSession,   // --- Import new action
-    resumeSession,  // --- Import new action
+    pauseSession,
+    resumeSession,
   } = useSessionsStore()
   
   const { showConfirm, showToast } = useUIStore()
@@ -26,9 +26,12 @@ export function Stopwatch({ projectId }: StopwatchProps) {
   const intervalRef = useRef<NodeJS.Timeout>()
   const stopwatchRef = useRef<HTMLDivElement>(null)
 
+  // --- Add new state for current time and date ---
+  const [currentTime, setCurrentTime] = useState(formatTime(Date.now()))
+  const [currentDate, setCurrentDate] = useState(formatDate(Date.now()))
+
   const isRunning = runningSession?.running === true
   const isCurrentProject = runningSession?.projectId === projectId
-  // --- Derive pause state from the global store ---
   const isPaused = isRunning && isCurrentProject && runningSession?.isPaused === true
 
   useEffect(() => {
@@ -36,7 +39,6 @@ export function Stopwatch({ projectId }: StopwatchProps) {
   }, [loadRunningSession])
 
   useEffect(() => {
-    // Set note from running session, but only if it's not being edited
     if (runningSession?.note && !isRunning) {
       setNote(runningSession.note)
     } else if (runningSession?.note) {
@@ -47,12 +49,10 @@ export function Stopwatch({ projectId }: StopwatchProps) {
   }, [runningSession, isRunning])
 
   useEffect(() => {
-    // --- Logic now correctly uses isPaused from the store ---
     if (isRunning && isCurrentProject && !isPaused) {
       const updateElapsed = () => {
         setElapsed(getCurrentElapsed())
       }
-
       updateElapsed()
       intervalRef.current = setInterval(updateElapsed, 100)
 
@@ -65,7 +65,6 @@ export function Stopwatch({ projectId }: StopwatchProps) {
       if (intervalRef.current) {
         clearInterval(intervalRef.current)
       }
-      // Update elapsed time one last time when pausing
       if (isRunning && isCurrentProject) {
         setElapsed(getCurrentElapsed())
       }
@@ -75,7 +74,16 @@ export function Stopwatch({ projectId }: StopwatchProps) {
     }
   }, [isRunning, isCurrentProject, isPaused, getCurrentElapsed])
 
-  // Handle visibility change to recompute elapsed time
+  // --- New useEffect to update clock and date every second ---
+  useEffect(() => {
+    const clockInterval = setInterval(() => {
+      setCurrentTime(formatTime(Date.now()));
+      setCurrentDate(formatDate(Date.now()));
+    }, 1000);
+
+    return () => clearInterval(clockInterval);
+  }, []);
+
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (!document.hidden && isRunning && !isPaused) {
@@ -92,7 +100,6 @@ export function Stopwatch({ projectId }: StopwatchProps) {
       showToast('Please select a project first', 'error')
       return
     }
-
     try {
       if (isRunning && !isCurrentProject) {
         showConfirm(
@@ -123,7 +130,6 @@ export function Stopwatch({ projectId }: StopwatchProps) {
     }
   }
 
-  // --- Updated Pause Handler to call store actions ---
   const handlePauseToggle = () => {
     if (isPaused) {
       resumeSession()
@@ -153,7 +159,6 @@ export function Stopwatch({ projectId }: StopwatchProps) {
     }
   }
 
-
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.code === 'Space' && e.target === stopwatchRef.current) {
       e.preventDefault()
@@ -182,7 +187,16 @@ export function Stopwatch({ projectId }: StopwatchProps) {
       aria-label="Stopwatch"
       aria-live="polite"
     >
-      <div className="text-center">
+      <div className="relative">
+        <div className="absolute top-0 left-0 text-lg sm:text-sm font-medium text-gray-500">
+          {currentTime}
+        </div>
+        <div className="absolute top-0 right-0 text-lg sm:text-sm font-medium text-gray-500">
+          {currentDate}
+        </div>
+      </div>
+      
+      <div className="text-center pt-8">
         <div className={`text-4xl font-mono font-bold mb-4 ${
           isRunning && isCurrentProject ? (isPaused ? 'text-yellow-700' : 'text-green-700') : 'text-gray-700'
         }`}>
@@ -193,7 +207,7 @@ export function Stopwatch({ projectId }: StopwatchProps) {
           value={note}
           onChange={(e) => setNote(e.target.value)}
           placeholder="Add a note for this session..."
-          className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
+          className="w-full border border-gray-300 rounded-md px-3 py-2 text-lg sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
           rows={2}
           disabled={isRunning}
         />

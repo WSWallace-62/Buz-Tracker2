@@ -57,7 +57,8 @@ export function formatDurationHHMM(ms: number): string {
 }
 
 export function formatTime(timestamp: number): string {
-  return dayjs(timestamp).format('HH:mm')
+  // Use a 12-hour clock with AM/PM
+  return dayjs(timestamp).format('h:mm A')
 }
 
 export function formatDate(timestamp: number): string {
