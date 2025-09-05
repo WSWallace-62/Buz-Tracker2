@@ -184,27 +184,34 @@ export function HistoryPanel() {
     }
   }, [filteredSessions, groupBy, projects, startDate, endDate])
 
-  const chartOptions = {
-    responsive: true,
-    plugins: {
-      legend: {
-        position: 'top' as const,
-      },
-      title: {
-        display: true,
-        text: groupBy === 'project' ? 'Hours by Project' : 'Hours per Day'
-      },
-    },
-    scales: {
-      y: {
-        beginAtZero: true,
+  const chartOptions = useMemo(() => {
+    const maxDataValue = chartData.datasets[0].data.length > 0
+      ? Math.max(...chartData.datasets[0].data)
+      : 0
+
+    return {
+      responsive: true,
+      plugins: {
+        legend: {
+          position: 'top' as const,
+        },
         title: {
           display: true,
-          text: 'Hours'
+          text: groupBy === 'project' ? 'Hours by Project' : 'Hours per Day'
+        },
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          title: {
+            display: true,
+            text: 'Hours'
+          },
+          max: maxDataValue <= 5 ? 5 : undefined
         }
       }
     }
-  }
+  }, [chartData, groupBy])
 
   const handleProjectToggle = (projectId: number) => {
     setSelectedProjectIds(prev => 

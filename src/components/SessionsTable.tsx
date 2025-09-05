@@ -103,7 +103,7 @@ export function SessionsTable({ projectId, showAllProjects = false, sessions: ex
         </h3>
       </div>
       
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto overflow-y-auto max-h-[29rem]">
         <table className="w-full">
           <thead className="bg-gray-50">
             <tr>
