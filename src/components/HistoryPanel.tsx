@@ -184,27 +184,34 @@ export function HistoryPanel() {
     }
   }, [filteredSessions, groupBy, projects, startDate, endDate])
 
-  const chartOptions = {
-    responsive: true,
-    plugins: {
-      legend: {
-        position: 'top' as const,
-      },
-      title: {
-        display: true,
-        text: groupBy === 'project' ? 'Hours by Project' : 'Hours per Day'
-      },
-    },
-    scales: {
-      y: {
-        beginAtZero: true,
+  const chartOptions = useMemo(() => {
+    const maxDataValue = chartData.datasets[0].data.length > 0
+      ? Math.max(...chartData.datasets[0].data)
+      : 0
+
+    return {
+      responsive: true,
+      plugins: {
+        legend: {
+          position: 'top' as const,
+        },
         title: {
           display: true,
-          text: 'Hours'
+          text: groupBy === 'project' ? 'Hours by Project' : 'Hours per Day'
+        },
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          title: {
+            display: true,
+            text: 'Hours'
+          },
+          max: maxDataValue <= 5 ? 5 : undefined
         }
       }
     }
-  }
+  }, [chartData, groupBy])
 
   const handleProjectToggle = (projectId: number) => {
     setSelectedProjectIds(prev => 
@@ -377,7 +384,7 @@ export function HistoryPanel() {
       <div className="bg-white rounded-lg shadow-md p-6">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-semibold">History & Analytics</h2>
-          <span className="text-sm font-medium text-gray-500">Rev 1.10</span>
+          <span className="text-sm font-medium text-gray-500">Rev 1.11</span>
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
