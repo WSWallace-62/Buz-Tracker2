@@ -3,7 +3,7 @@ import { useSessionsStore } from '../store/sessions'
 import { useProjectsStore } from '../store/projects'
 import { useUIStore } from '../store/ui'
 // --- Import the new parseDurationToMs function ---
-import { formatTime, formatDurationHHMM, isToday, formatDate, createTimeRange, parseDurationToMs } from '../utils/time'
+import { formatTime, formatDurationHHMM, isToday, formatDate, parseDurationToMs } from '../utils/time'
 import { Session } from '../db/dexie'
 
 interface SessionsTableProps {
@@ -214,39 +214,18 @@ function EditSessionModal({ session, onClose }: EditSessionModalProps) {
   const { updateSession } = useSessionsStore()
   const { projects } = useProjectsStore()
   const { showToast } = useUIStore()
-  
+
   const [projectId, setProjectId] = useState(session.projectId)
-  const [startTime, setStartTime] = useState(formatTime(session.start))
-  const [stopTime, setStopTime] = useState(session.stop ? formatTime(session.stop) : '')
   const [duration, setDuration] = useState(formatDurationHHMM(session.durationMs))
   const [note, setNote] = useState(session.note || '')
-
-  // Recalculate stop time whenever start time or duration changes
-  useEffect(() => {
-    try {
-      const durationMs = parseDurationToMs(duration);
-      if (durationMs >= 0 && startTime) {
-        const startMs = createTimeRange(formatDate(session.start), startTime, '23:59').start;
-        const newStopMs = startMs + durationMs;
-        setStopTime(formatTime(newStopMs));
-      }
-    } catch {
-      // Ignore parsing errors while user is typing
-      setStopTime('');
-    }
-  }, [startTime, duration, session.start]);
 
   const handleDurationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setDuration(e.target.value)
   }
 
-  const handleStartTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setStartTime(e.target.value)
-  }
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     try {
       const durationMs = parseDurationToMs(duration)
       if (durationMs < 0) {
@@ -254,20 +233,16 @@ function EditSessionModal({ session, onClose }: EditSessionModalProps) {
         return
       }
 
-      const startDate = new Date(session.start)
-      const [startHour, startMin] = startTime.split(':').map(Number)
-      const newStart = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate(), startHour, startMin).getTime()
-      
-      const newStop = newStart + durationMs
+      const newStop = session.start + durationMs
 
       await updateSession(session.id!, {
         projectId,
-        start: newStart,
+        start: session.start,
         stop: newStop,
         durationMs,
         note: note || undefined
       })
-      
+
       showToast('Session updated', 'success')
       onClose()
     } catch (error) {
@@ -307,43 +282,15 @@ function EditSessionModal({ session, onClose }: EditSessionModalProps) {
             </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Start Time
-              </label>
-              <input
-                type="time"
-                value={startTime}
-                onChange={handleStartTimeChange}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                End Time
-              </label>
-              <input
-                type="time"
-                value={stopTime}
-                readOnly
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-100"
-              />
-            </div>
-          </div>
-
-          {/* --- New Duration Field --- */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Duration (HH:MM)
+              Duration (HH:MM or minutes)
             </label>
             <input
               type="text"
               value={duration}
               onChange={handleDurationChange}
-              placeholder="e.g., 1:30"
+              placeholder="e.g., 1:30 or 90"
               className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>

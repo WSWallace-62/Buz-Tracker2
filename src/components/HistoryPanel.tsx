@@ -375,7 +375,10 @@ export function HistoryPanel() {
     <div className="space-y-6">
       {/* Filters */}
       <div className="bg-white rounded-lg shadow-md p-6">
-        <h2 className="text-xl font-semibold mb-4">History & Analytics</h2>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-semibold">History & Analytics</h2>
+          <span className="text-sm font-medium text-gray-500">Rev 1.10</span>
+        </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
           <div>
