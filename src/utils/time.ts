@@ -61,6 +61,10 @@ export function formatTime(timestamp: number): string {
   return dayjs(timestamp).format('h:mm A')
 }
 
+export function formatTimeForInput(timestamp: number): string {
+  return dayjs(timestamp).format('HH:mm')
+}
+
 export function formatDate(timestamp: number): string {
   return dayjs(timestamp).format('YYYY-MM-DD')
 }

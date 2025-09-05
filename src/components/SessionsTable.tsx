@@ -3,7 +3,7 @@ import { useSessionsStore } from '../store/sessions'
 import { useProjectsStore } from '../store/projects'
 import { useUIStore } from '../store/ui'
 // --- Import the new parseDurationToMs function ---
-import { formatTime, formatDurationHHMM, isToday, formatDate, createTimeRange, parseDurationToMs } from '../utils/time'
+import { formatTime, formatDurationHHMM, isToday, formatDate, createTimeRange, parseDurationToMs, formatTimeForInput } from '../utils/time'
 import { Session } from '../db/dexie'
 
 interface SessionsTableProps {
@@ -214,27 +214,29 @@ function EditSessionModal({ session, onClose }: EditSessionModalProps) {
   const { updateSession } = useSessionsStore()
   const { projects } = useProjectsStore()
   const { showToast } = useUIStore()
-  
+
   const [projectId, setProjectId] = useState(session.projectId)
-  const [startTime, setStartTime] = useState(formatTime(session.start))
-  const [stopTime, setStopTime] = useState(session.stop ? formatTime(session.stop) : '')
+  const [startTime, setStartTime] = useState(formatTimeForInput(session.start))
+  const [stopTime, setStopTime] = useState(session.stop ? formatTimeForInput(session.stop) : '')
   const [duration, setDuration] = useState(formatDurationHHMM(session.durationMs))
   const [note, setNote] = useState(session.note || '')
+  const [isDurationFocused, setIsDurationFocused] = useState(false)
 
-  // Recalculate stop time whenever start time or duration changes
+  // Recalculate duration whenever start or stop time changes,
+  // but only if the duration field isn't focused.
   useEffect(() => {
-    try {
-      const durationMs = parseDurationToMs(duration);
-      if (durationMs >= 0 && startTime) {
-        const startMs = createTimeRange(formatDate(session.start), startTime, '23:59').start;
-        const newStopMs = startMs + durationMs;
-        setStopTime(formatTime(newStopMs));
+    if (startTime && stopTime && !isDurationFocused) {
+      try {
+        const startMs = createTimeRange(formatDate(session.start), startTime, '23:59').start
+        const stopMs = createTimeRange(formatDate(session.start), stopTime, '23:59').start
+        if (stopMs > startMs) {
+          setDuration(formatDurationHHMM(stopMs - startMs))
+        }
+      } catch {
+        // ignore errors
       }
-    } catch {
-      // Ignore parsing errors while user is typing
-      setStopTime('');
     }
-  }, [startTime, duration, session.start]);
+  }, [startTime, stopTime, session.start, isDurationFocused])
 
   const handleDurationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setDuration(e.target.value)
@@ -244,9 +246,13 @@ function EditSessionModal({ session, onClose }: EditSessionModalProps) {
     setStartTime(e.target.value)
   }
 
+  const handleStopTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setStopTime(e.target.value)
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     try {
       const durationMs = parseDurationToMs(duration)
       if (durationMs < 0) {
@@ -254,11 +260,15 @@ function EditSessionModal({ session, onClose }: EditSessionModalProps) {
         return
       }
 
-      const startDate = new Date(session.start)
-      const [startHour, startMin] = startTime.split(':').map(Number)
-      const newStart = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate(), startHour, startMin).getTime()
-      
-      const newStop = newStart + durationMs
+      const date = formatDate(session.start)
+      const newStart = startTime ? createTimeRange(date, startTime, '23:59').start : session.start
+      const newStop = stopTime ? createTimeRange(date, stopTime, '23:59').start : null
+
+      // Validate that stop time is after start time if both are set
+      if (newStart && newStop && newStop <= newStart) {
+        showToast('End time must be after start time', 'error');
+        return;
+      }
 
       await updateSession(session.id!, {
         projectId,
@@ -267,7 +277,7 @@ function EditSessionModal({ session, onClose }: EditSessionModalProps) {
         durationMs,
         note: note || undefined
       })
-      
+
       showToast('Session updated', 'success')
       onClose()
     } catch (error) {
@@ -328,22 +338,23 @@ function EditSessionModal({ session, onClose }: EditSessionModalProps) {
               <input
                 type="time"
                 value={stopTime}
-                readOnly
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-100"
+                onChange={handleStopTimeChange}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
           </div>
 
-          {/* --- New Duration Field --- */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Duration (HH:MM)
+              Duration (HH:MM or minutes)
             </label>
             <input
               type="text"
               value={duration}
               onChange={handleDurationChange}
-              placeholder="e.g., 1:30"
+              onFocus={() => setIsDurationFocused(true)}
+              onBlur={() => setIsDurationFocused(false)}
+              placeholder="e.g., 1:30 or 90"
               className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
