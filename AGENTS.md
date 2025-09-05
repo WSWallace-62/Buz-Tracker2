@@ -59,3 +59,4 @@ BuzTracker is a time tracking and project management Progressive Web App (PWA) b
 - Charts responsive with mobile breakpoints
 - Service worker auto-updates via Vite PWA plugin
 - All modals use proper focus management and escape handling
+- **Session Editing**: In the "Edit Session" modal, the duration is edited directly. The start and end times are not shown, and the session's `stop` time is recalculated based on the `start` time and the modified duration.

@@ -3,7 +3,7 @@ import { useSessionsStore } from '../store/sessions'
 import { useProjectsStore } from '../store/projects'
 import { useUIStore } from '../store/ui'
 // --- Import the new parseDurationToMs function ---
-import { formatTime, formatDurationHHMM, isToday, formatDate, createTimeRange, parseDurationToMs } from '../utils/time'
+import { formatTime, formatDurationHHMM, isToday, formatDate, parseDurationToMs } from '../utils/time'
 import { Session } from '../db/dexie'
 
 interface SessionsTableProps {
