@@ -6,7 +6,7 @@ import { useProjectsStore } from './store/projects';
 import { useSessionsStore } from './store/sessions';
 import { useUIStore } from './store/ui';
 import { useAuthStore } from './store/auth';
-import { db } from './db/dexie';
+import { db, clearDatabase } from './db/dexie'; // Import clearDatabase
 import { auth } from './firebase';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { ProjectSelect } from './components/ProjectSelect';
@@ -87,12 +87,27 @@ function AppContent() {
   };
 
   const handleLogout = async () => {
+    // 1. Stop all real-time sync listeners to prevent errors
+    stopProjectSync();
+    stopSync();
+
+    // 2. Sign out from Firebase
     if (auth) {
       await signOut(auth);
     }
-    stopProjectSync();
+    
+    // 3. Completely wipe the local database to ensure no data leaks
+    await clearDatabase();
+
+    // 4. Reset all global state stores to their initial values
+    useProjectsStore.setState({ projects: [], isLoading: false, error: null });
+    useSessionsStore.setState({ sessions: [], runningSession: null, isLoading: true, error: null });
+    useUIStore.setState({ currentProjectId: null });
     setUser(null);
     setIsGuest(false);
+    
+    // 5. Re-initialize default Dexie data (like the default project) for a fresh start
+    await db.on.ready.fire(db); // <-- FIX 1: Pass db instance
   };
 
   const loadingSpinner = (
@@ -240,4 +255,4 @@ function AppContent() {
       <Toast />
     </div>
   );
-}
+} // <-- FIX 2: Removed extra curly brace from here

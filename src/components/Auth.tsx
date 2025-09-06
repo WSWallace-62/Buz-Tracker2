@@ -1,5 +1,8 @@
+// wswallace-62/buz-tracker2/Buz-Tracker2-Login-Logout-1/src/components/Auth.tsx
+
 import React, { useState } from 'react';
-import { auth } from '../firebase';
+import { auth, db } from '../firebase'; // <-- Import db
+import { doc, setDoc } from 'firebase/firestore'; // <-- Import Firestore functions
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -28,7 +31,7 @@ export function Auth({ onLogin }: AuthProps) {
     setError('');
     setMessage('');
 
-    if (!auth) {
+    if (!auth || !db) { // <-- Check for db
       setError('Authentication service is not available. Please try again later.');
       return;
     }
@@ -36,9 +39,21 @@ export function Auth({ onLogin }: AuthProps) {
     try {
       if (isSignUp) {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        await updateProfile(userCredential.user, {
+        const user = userCredential.user;
+        
+        // Update the user's profile in Firebase Auth
+        await updateProfile(user, {
           displayName: `${firstName} ${lastName}`,
         });
+
+        // --- NEW: Create the user document in Firestore ---
+        const userDocRef = doc(db, 'users', user.uid);
+        await setDoc(userDocRef, {
+          firstName: firstName,
+          lastName: lastName,
+          email: user.email // Store email for easier reference
+        });
+        
         await sendEmailVerification(userCredential.user);
         setMessage('A verification email has been sent. Please check your inbox.');
       } else {
