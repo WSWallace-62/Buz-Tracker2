@@ -83,3 +83,16 @@ export class BuzTrackerDB extends Dexie {
 }
 
 export const db = new BuzTrackerDB()
+
+// --- Add this new function at the end of the file ---
+export async function clearDatabase() {
+  await db.transaction('rw', db.projects, db.sessions, db.settings, db.runningSession, async () => {
+    await Promise.all([
+      db.projects.clear(),
+      db.sessions.clear(),
+      db.settings.clear(),
+      db.runningSession.clear(),
+    ]);
+  });
+  console.log('Local database cleared.');
+}
