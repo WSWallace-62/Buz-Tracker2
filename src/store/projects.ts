@@ -1,8 +1,11 @@
 import { create } from 'zustand'
 import { db, Project } from '../db/dexie'
 import { db as firestoreDB } from '../firebase'
-import { collection, addDoc, doc, updateDoc, deleteDoc, getDocs } from 'firebase/firestore'
+import { collection, addDoc, doc, updateDoc, deleteDoc, getDocs, onSnapshot, query, Unsubscribe } from 'firebase/firestore'
 import { useAuthStore } from './auth'
+
+// Keep track of the unsubscribe function for projects
+let unsubscribeFromProjects: Unsubscribe | null = null;
 
 interface ProjectsState {
   projects: Project[]
@@ -16,12 +19,72 @@ interface ProjectsState {
   deleteProject: (id: number) => Promise<void>
   reconcileProjects: () => Promise<void>
   archiveProject: (id: number, archived: boolean) => Promise<void>
+  // Add the new sync actions to the interface
+  startProjectSync: () => void
+  stopProjectSync: () => void
 }
 
 export const useProjectsStore = create<ProjectsState>((set, get) => ({
   projects: [],
   isLoading: false,
   error: null,
+
+  startProjectSync: () => {
+    const user = useAuthStore.getState().user;
+    if (!user || !firestoreDB) {
+      console.log("User not logged in or firestore not available. Skipping project sync.");
+      get().loadProjects(); // Still load local projects
+      return;
+    }
+
+    if (unsubscribeFromProjects) {
+      console.log("Project sync already active.");
+      return;
+    }
+    
+    console.log("Starting Firestore project sync...");
+    const projectsCollection = query(collection(firestoreDB, 'users', user.uid, 'projects'));
+
+    unsubscribeFromProjects = onSnapshot(projectsCollection, async (snapshot) => {
+      await db.transaction('rw', db.projects, async () => {
+        for (const change of snapshot.docChanges()) {
+          const fsProject = { ...change.doc.data(), firestoreId: change.doc.id } as Project;
+          const existingProject = await db.projects.where('firestoreId').equals(fsProject.firestoreId!).first();
+          
+          switch (change.type) {
+            case 'added':
+              if (!existingProject) {
+                 await db.projects.add(fsProject);
+              }
+              break;
+            case 'modified':
+              if (existingProject?.id) {
+                await db.projects.update(existingProject.id, fsProject);
+              }
+              break;
+            case 'removed':
+               if (existingProject?.id) {
+                await db.projects.delete(existingProject.id);
+              }
+              break;
+          }
+        }
+      });
+      // After processing changes, reload all projects from Dexie to update UI
+      await get().loadProjects();
+    }, (error) => {
+      console.error("Error with Firestore project snapshot listener:", error);
+      set({ error: "Failed to sync projects." });
+    });
+  },
+
+  stopProjectSync: () => {
+    if (unsubscribeFromProjects) {
+      console.log("Stopping Firestore project sync.");
+      unsubscribeFromProjects();
+      unsubscribeFromProjects = null;
+    }
+  },
 
   loadProjects: async () => {
     set({ isLoading: true, error: null })
@@ -202,4 +265,4 @@ export const useProjectsStore = create<ProjectsState>((set, get) => ({
   archiveProject: async (id, archived) => {
     await get().updateProject(id, { archived })
   }
-}))
+}));

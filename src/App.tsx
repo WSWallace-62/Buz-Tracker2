@@ -38,7 +38,7 @@ export function App() {
 
 function AppContent() {
   const isOnline = useOnlineStatus();
-  const { reconcileProjects } = useProjectsStore();
+  const { reconcileProjects, startProjectSync, stopProjectSync } = useProjectsStore();
   const { loadSessions, loadRunningSession, getTodaySessions, startSync, stopSync } = useSessionsStore();
   const { currentProjectId, setCurrentProject, openAddEntryModal } = useUIStore();
   const { user, setUser } = useAuthStore();
@@ -55,7 +55,8 @@ function AppContent() {
     if (currentUser) {
       setIsGuest(false);
       await reconcileProjects();
-      startSync();
+      startProjectSync(); // Start listening for real-time project changes
+      startSync(); // This one is for sessions
     } else if (isGuest) {
       await loadSessions();
     }
@@ -69,18 +70,17 @@ function AppContent() {
     }
 
     setIsLoading(false);
-  }, [isGuest, setUser, reconcileProjects, loadSessions, loadRunningSession, startSync, setCurrentProject]);
+  }, [isGuest, setUser, reconcileProjects, loadSessions, loadRunningSession, startSync, setCurrentProject, startProjectSync]);
 
-  // FIX: This useEffect should only run ONCE to set up the auth listener.
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, initializeApp);
     
-    // The cleanup function will be called when the component unmounts.
     return () => {
       unsubscribe();
-      stopSync(); // This line uses stopSync...
+      stopProjectSync(); // Stop the project listener on cleanup
+      stopSync();
     };
-  }, [initializeApp, stopSync]); // ...so it MUST be included here.
+  }, [initializeApp, stopProjectSync, stopSync]);
 
   const handleLogin = () => {
     setIsGuest(true);
@@ -90,6 +90,7 @@ function AppContent() {
     if (auth) {
       await signOut(auth);
     }
+    stopProjectSync();
     setUser(null);
     setIsGuest(false);
   };
