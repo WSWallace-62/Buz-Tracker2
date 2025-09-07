@@ -19,12 +19,16 @@ module.exports = {
     '@typescript-eslint/no-explicit-any': 'off',
   },
   settings: {
-    react: {
-      version: 'detect', // <-- Helps ESLint understand your React version
-    },
+  
   },
   env: { // <-- Add environment info
     browser: true,
     es2020: true
-  }
+  },
+  overrides: [
+    {
+      files: ['*.css', '*.pcss'],
+      parser: 'postcss-scss',
+    },
+  ],
 };

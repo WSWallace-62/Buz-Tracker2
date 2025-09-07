@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db as dexieDB } from '../db/dexie'
 import { db as firestoreDB } from '../firebase'
@@ -47,6 +47,8 @@ export function HistoryPanel() {
   const [showChart, setShowChart] = useState(true)
   const [sortOrder, setSortOrder] = useState<'date-desc' | 'date-asc' | 'start-desc' | 'start-asc'>('date-desc')
   const [noteFilter, setNoteFilter] = useState('')
+  
+  const [showUpArrow, setShowUpArrow] = useState(false)
 
   const dateRanges = useMemo(() => getDateRanges(), [])
 
@@ -378,6 +380,25 @@ export function HistoryPanel() {
     }
   }
 
+  // Effect to show/hide the up arrow button
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollThreshold = window.innerHeight * 0.2
+      if (window.scrollY > scrollThreshold) {
+        setShowUpArrow(true)
+      } else {
+        setShowUpArrow(false)
+      }
+    }
+
+    window.addEventListener('scroll', handleScroll)
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
+
+  const handleScrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
   return (
     <div className="space-y-6">
       {/* Filters */}
@@ -603,6 +624,19 @@ export function HistoryPanel() {
           </div>
         </div>
       )}
+
+      {/* Floating up arrow button */}
+      <button
+        onClick={handleScrollToTop}
+        className={`fixed bottom-8 left-8 z-40 p-3 bg-gray-600 text-white rounded-full shadow-lg
+                    transition-opacity duration-300 opacity-25 hover:opacity-75
+                    ${showUpArrow ? 'visible' : 'invisible'}`}
+        aria-label="Scroll to top"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18" />
+        </svg>
+      </button>
     </div>
   )
 }

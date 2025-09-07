@@ -103,7 +103,7 @@ export function SessionsTable({ projectId, showAllProjects = false, sessions: ex
         </h3>
       </div>
       
-      <div className="overflow-x-auto overflow-y-auto max-h-[29rem]">
+      <div className="overflow-x-auto overflow-y-auto max-h-[18rem] custom-scrollbar">
         <table className="w-full">
           <thead className="bg-gray-50">
             <tr>
@@ -259,7 +259,7 @@ function EditSessionModal({ session, onClose }: EditSessionModalProps) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black bg-opacity-25 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg p-6 w-full max-w-md" onKeyDown={handleKeyDown}>
         <h3 className="text-lg font-semibold mb-4">Edit Session</h3>
         
