@@ -23,13 +23,9 @@
 }
 
 /* Custom scrollbar */
-.custom-scrollbar {
-  scrollbar-width: thin;
-  scrollbar-color: #cbd5e0 #f7fafc;
-}
-
 .custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
+  width: 20px;
+  height: 20px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
@@ -38,7 +34,7 @@
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
   background: #cbd5e0;
-  border-radius: 3px;
+  border-radius: 20px; /* Adjust border-radius to match the new width */
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {

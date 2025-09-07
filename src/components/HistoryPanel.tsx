@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db as dexieDB } from '../db/dexie'
 import { db as firestoreDB } from '../firebase'
@@ -20,6 +20,7 @@ import {
 } from 'chart.js'
 import { Bar } from 'react-chartjs-2'
 import Papa from 'papaparse'
+import { useWindowWidth } from '../hooks/useWindowWidth'
 
 ChartJS.register(
   CategoryScale,
@@ -38,7 +39,8 @@ export function HistoryPanel() {
   const { projects } = useProjectsStore()
   const { showToast } = useUIStore()
   const { user } = useAuthStore()
-  
+  const windowWidth = useWindowWidth()
+
   const [dateFilter, setDateFilter] = useState<DateFilter>('thisYear')
   const [customStart, setCustomStart] = useState('')
   const [customEnd, setCustomEnd] = useState('')
@@ -47,6 +49,8 @@ export function HistoryPanel() {
   const [showChart, setShowChart] = useState(true)
   const [sortOrder, setSortOrder] = useState<'date-desc' | 'date-asc' | 'start-desc' | 'start-asc'>('date-desc')
   const [noteFilter, setNoteFilter] = useState('')
+
+  const [showUpArrow, setShowUpArrow] = useState(false)
 
   const dateRanges = useMemo(() => getDateRanges(), [])
 
@@ -112,7 +116,7 @@ export function HistoryPanel() {
   const chartData = useMemo(() => {
     if (groupBy === 'project') {
       const projectTotals = new Map<number, number>()
-      
+
       filteredSessions.forEach(session => {
         const current = projectTotals.get(session.projectId) || 0
         projectTotals.set(session.projectId, current + session.durationMs)
@@ -123,7 +127,7 @@ export function HistoryPanel() {
         return project?.name || 'Unknown'
       })
 
-      const data = Array.from(projectTotals.values()).map(ms => 
+      const data = Array.from(projectTotals.values()).map(ms =>
         parseFloat(formatDurationHours(ms))
       )
 
@@ -145,7 +149,7 @@ export function HistoryPanel() {
     } else {
       // Group by day
       const dayTotals = new Map<string, number>()
-      
+
       filteredSessions.forEach(session => {
         const day = formatDate(session.start)
         const current = dayTotals.get(day) || 0
@@ -155,7 +159,7 @@ export function HistoryPanel() {
       // Fill in missing days in range
       const currentDate = new Date(startDate)
       const endDateObj = new Date(endDate)
-      
+
       while (currentDate <= endDateObj) {
         const day = formatDate(currentDate.getTime())
         if (!dayTotals.has(day)) {
@@ -164,7 +168,7 @@ export function HistoryPanel() {
         currentDate.setDate(currentDate.getDate() + 1)
       }
 
-      const sortedEntries = Array.from(dayTotals.entries()).sort((a, b) => 
+      const sortedEntries = Array.from(dayTotals.entries()).sort((a, b) =>
         new Date(a[0]).getTime() - new Date(b[0]).getTime()
       )
 
@@ -189,8 +193,11 @@ export function HistoryPanel() {
       ? Math.max(...chartData.datasets[0].data)
       : 0
 
+    const isMobile = windowWidth < 768
+
     return {
       responsive: true,
+      maintainAspectRatio: false,
       plugins: {
         legend: {
           position: 'top' as const,
@@ -207,14 +214,14 @@ export function HistoryPanel() {
             display: true,
             text: 'Hours'
           },
-          max: maxDataValue <= 5 ? 5 : undefined
+          max: !isMobile && maxDataValue <= 5 ? 5 : undefined
         }
       }
     }
-  }, [chartData, groupBy])
+  }, [chartData, groupBy, windowWidth])
 
   const handleProjectToggle = (projectId: number) => {
-    setSelectedProjectIds(prev => 
+    setSelectedProjectIds(prev =>
       prev.includes(projectId)
         ? prev.filter(id => id !== projectId)
         : [...prev, projectId]
@@ -378,6 +385,25 @@ export function HistoryPanel() {
     }
   }
 
+  // Effect to show/hide the up arrow button
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollThreshold = window.innerHeight * 0.2
+      if (window.scrollY > scrollThreshold) {
+        setShowUpArrow(true)
+      } else {
+        setShowUpArrow(false)
+      }
+    }
+
+    window.addEventListener('scroll', handleScroll)
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
+
+  const handleScrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
   return (
     <div className="space-y-6">
       {/* Filters */}
@@ -386,7 +412,7 @@ export function HistoryPanel() {
           <h2 className="text-xl font-semibold">History & Analytics</h2>
           <span className="text-sm font-medium text-gray-500">Rev 1.12</span>
         </div>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -421,7 +447,7 @@ export function HistoryPanel() {
                   className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   End Date
@@ -527,9 +553,7 @@ export function HistoryPanel() {
                     : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                 }`}
                 style={{
-                  backgroundColor: selectedProjectIds.includes(project.id!) 
-                    ? project.color 
-                    : undefined
+                  backgroundColor: selectedProjectIds.includes(project.id!) ? project.color : undefined
                 }}
               >
                 <div
@@ -549,7 +573,7 @@ export function HistoryPanel() {
           >
             {showChart ? 'Hide Chart' : 'Show Chart'}
           </button>
-          
+
           <button
             onClick={exportCSV}
             className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm"
@@ -583,7 +607,7 @@ export function HistoryPanel() {
             {summaryData.totalHours.toFixed(1)}
           </p>
         </div>
-        
+
         <div className="bg-white rounded-lg shadow-md p-6">
           <h3 className="text-lg font-semibold mb-2">Sessions Count</h3>
           <p className="text-3xl font-bold text-green-600">
@@ -598,11 +622,24 @@ export function HistoryPanel() {
       {/* Chart */}
       {showChart && chartData.datasets[0].data.some(val => val > 0) && (
         <div className="bg-white rounded-lg shadow-md p-6">
-          <div style={{ height: '400px' }}>
+          <div className="chart-container">
             <Bar data={chartData} options={chartOptions} />
           </div>
         </div>
       )}
+
+      {/* Floating up arrow button */}
+      <button
+        onClick={handleScrollToTop}
+        className={`fixed bottom-8 left-8 z-40 p-3 bg-gray-600 text-white rounded-full shadow-lg
+                    transition-opacity duration-300 opacity-25 hover:opacity-75
+                    ${showUpArrow ? 'visible' : 'invisible'}`}
+        aria-label="Scroll to top"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18" />
+        </svg>
+      </button>
     </div>
   )
 }
