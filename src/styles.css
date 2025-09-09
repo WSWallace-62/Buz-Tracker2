@@ -121,22 +121,20 @@
   @apply absolute -top-10 left-6 bg-blue-600 text-white px-4 py-2 rounded-md z-50 focus:top-6 transition-all;
 }
 
-/* --- Corrected Print Styles --- */
+/* --- Final Print Styles --- */
 @media print {
-  /* When the report is active... */
-  body.report-view-active {
-    /* ...hide everything on the page that ISN'T the report overlay. */
-    & > *:not(.printable-report) {
-      display: none !important;
-    }
+  /* Hide the main app container when the report is active */
+  body.report-active > #root {
+    display: none;
   }
 
-  /*
-    Prepare the report overlay for printing:
-    - Make it visible.
-    - Remove fixed positioning and let it behave like a normal document.
-    - Ensure it takes up the full page.
-  */
+  /* Make the portal container visible and static for printing */
+  .printable-report-container {
+    display: block !important;
+    position: static !important;
+  }
+  
+  /* Reset the inner report wrapper to be printable */
   .printable-report {
     position: static !important;
     width: 100% !important;
@@ -144,9 +142,11 @@
     overflow: visible !important;
     box-shadow: none !important;
     border: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
-
-  /* Hide the 'Print' and 'Close' buttons from the final PDF */
+  
+  /* Hide any elements specifically marked not for printing */
   .no-print {
     display: none !important;
   }

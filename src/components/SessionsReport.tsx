@@ -1,16 +1,16 @@
-// src/components/SessionReport.tsx
+// src/components/SessionsReport.tsx
 
 import { Session, Project } from '../db/dexie';
 import { formatDurationHours, formatDate, getTotalDuration } from '../utils/time';
 
-interface SessionReportProps {
+interface SessionsReportProps {
   project: Project | null;
   sessions: Session[];
   dateRange: { start: string; end: string };
   logoUrl?: string; // Optional: For your business logo
 }
 
-export function SessionReport({ project, sessions, dateRange, logoUrl }: SessionReportProps) {
+export function SessionsReport({ project, sessions, dateRange, logoUrl }: SessionsReportProps) {
   // Calculate total duration in milliseconds
   const totalMs = getTotalDuration(sessions);
   // Convert total duration to hours for display

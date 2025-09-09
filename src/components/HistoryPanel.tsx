@@ -1,6 +1,7 @@
 // src/components/HistoryPanel.tsx
 
 import { useState, useMemo, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db as dexieDB } from '../db/dexie';
 import { db as firestoreDB } from '../firebase';
@@ -11,7 +12,7 @@ import { useUIStore } from '../store/ui';
 import { useAuthStore } from '../store/auth';
 import { getDateRanges, formatDurationHours, formatDate } from '../utils/time';
 import { SessionsTable } from './SessionsTable';
-import { SessionReport } from './SessionsReport.tsx';
+import { SessionsReport } from './SessionsReport';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -58,12 +59,12 @@ export function HistoryPanel() {
 
   useEffect(() => {
     if (showReport) {
-      document.body.classList.add('report-view-active');
+      document.body.classList.add('report-active');
     } else {
-      document.body.classList.remove('report-view-active');
+      document.body.classList.remove('report-active');
     }
     return () => {
-      document.body.classList.remove('report-view-active');
+      document.body.classList.remove('report-active');
     };
   }, [showReport]);
 
@@ -377,7 +378,6 @@ export function HistoryPanel() {
 
           showToast(`Successfully imported ${importedSessions.length} sessions to Firestore.`, 'success');
         } catch(error) {
-          console.error("Failed to import sessions to Firestore", error);
           showToast('Failed to import sessions to Firestore', 'error');
         }
       },
@@ -422,7 +422,7 @@ export function HistoryPanel() {
   return (
     <div className="space-y-6">
       {/* Filters */}
-      <div className="bg-white rounded-lg shadow-md p-6">
+      <div className="bg-white rounded-lg shadow-md p-6 no-print">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-semibold">History & Analytics</h2>
           <span className="text-sm font-medium text-gray-500">Rev 1.12</span>
@@ -622,7 +622,7 @@ export function HistoryPanel() {
       </div>
 
       {/* Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 no-print">
         <div className="bg-white rounded-lg shadow-md p-6">
           <h3 className="text-lg font-semibold mb-2">Total Hours</h3>
           <p className="text-3xl font-bold text-blue-600">
@@ -639,11 +639,13 @@ export function HistoryPanel() {
       </div>
 
       {/* Sessions Table */}
-      <SessionsTable sessions={filteredSessions} showAllProjects={true} title={getDynamicTitle()} />
+      <div className="no-print">
+        <SessionsTable sessions={filteredSessions} showAllProjects={true} title={getDynamicTitle()} />
+      </div>
 
       {/* Chart */}
       {showChart && chartData.datasets[0].data.some(val => val > 0) && (
-        <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="bg-white rounded-lg shadow-md p-6 no-print">
           <div className="chart-container">
             <Bar data={chartData} options={chartOptions} />
           </div>
@@ -654,7 +656,7 @@ export function HistoryPanel() {
       <button
         onClick={handleScrollToTop}
         className={`fixed bottom-8 left-8 z-40 p-3 bg-gray-600 text-white rounded-full shadow-lg
-                    transition-opacity duration-300 opacity-25 hover:opacity-75
+                    transition-opacity duration-300 opacity-25 hover:opacity-75 no-print
                     ${showUpArrow ? 'visible' : 'invisible'}`}
         aria-label="Scroll to top"
       >
@@ -664,11 +666,11 @@ export function HistoryPanel() {
       </button>
 
       {/* --- REPORT OVERLAY --- */}
-      {showReport && (
-        <div className="fixed inset-0 bg-white z-50 overflow-y-auto printable-report">
-          <div className="max-w-4xl mx-auto p-4">
+      {showReport && createPortal(
+        <div className="fixed inset-0 bg-white z-50 overflow-y-auto printable-report-container">
+          <div className="max-w-4xl mx-auto p-4 printable-report">
             <div className="text-right mb-4 no-print">
-              <button
+               <button
                 onClick={() => window.print()}
                 className="px-4 py-2 text-white bg-blue-600 rounded-md hover:bg-blue-700 mr-2"
               >
@@ -681,7 +683,7 @@ export function HistoryPanel() {
                 Close
               </button>
             </div>
-            <SessionReport
+            <SessionsReport
               project={
                 selectedProjectIds.length === 1
                   ? projects.find(p => p.id === selectedProjectIds[0]) || null
@@ -691,7 +693,8 @@ export function HistoryPanel() {
               dateRange={{ start: customStart || formatDate(startDate), end: customEnd || formatDate(endDate) }}
             />
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
