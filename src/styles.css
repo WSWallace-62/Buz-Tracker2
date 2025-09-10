@@ -84,11 +84,11 @@
   .mobile-hidden {
     @apply hidden;
   }
-  
+
   .mobile-text-sm {
     @apply text-sm;
   }
-  
+
   .mobile-p-2 {
     @apply p-2;
   }
@@ -119,4 +119,35 @@
 /* Skip to content link for accessibility */
 .skip-link {
   @apply absolute -top-10 left-6 bg-blue-600 text-white px-4 py-2 rounded-md z-50 focus:top-6 transition-all;
+}
+
+/* --- Final Print Styles --- */
+@media print {
+  /* Hide the main app container when the report is active */
+  body.report-active > #root {
+    display: none;
+  }
+
+  /* Make the portal container visible and static for printing */
+  .printable-report-container {
+    display: block !important;
+    position: static !important;
+  }
+  
+  /* Reset the inner report wrapper to be printable */
+  .printable-report {
+    position: static !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+    border: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  
+  /* Hide any elements specifically marked not for printing */
+  .no-print {
+    display: none !important;
+  }
 }
