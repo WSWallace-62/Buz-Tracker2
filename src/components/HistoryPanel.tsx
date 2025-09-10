@@ -691,6 +691,7 @@ export function HistoryPanel() {
               }
               sessions={filteredSessions}
               dateRange={{ start: customStart || formatDate(startDate), end: customEnd || formatDate(endDate) }}
+              projects={projects}
             />
           </div>
         </div>,
