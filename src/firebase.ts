@@ -7,6 +7,7 @@ import {
   indexedDBLocalPersistence,
   Auth,
 } from "firebase/auth";
+import { getMessaging, Messaging } from "firebase/messaging";
 
 // Get Firebase config from Vite environment variables
 const firebaseConfig = {
@@ -26,6 +27,7 @@ const app = initializeApp(firebaseConfig);
 let auth: Auth;
 let db: Firestore;
 let storage: FirebaseStorage;
+let messaging: Messaging | undefined;
 
 // Initialize Firebase services only in the browser environment
 if (typeof window !== 'undefined') {
@@ -34,6 +36,13 @@ if (typeof window !== 'undefined') {
   });
   db = getFirestore(app);
   storage = getStorage(app);
+  messaging = getMessaging(app);
+} else {
+  // To satisfy TypeScript's strict initialization rules, assign undefined in non-browser environments
+  auth = undefined as any;
+  db = undefined as any;
+  storage = undefined as any;
+  messaging = undefined;
 }
 
-export { auth, db, storage };
+export { auth, db, storage, messaging };

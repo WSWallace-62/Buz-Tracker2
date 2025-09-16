@@ -24,6 +24,7 @@ const Auth = lazy(() => import('./components/Auth').then(module => ({ default: m
 const AddEntryModal = lazy(() => import('./components/AddEntryModal').then(module => ({ default: module.AddEntryModal })));
 const ProjectManagerModal = lazy(() => import('./components/ProjectManagerModal').then(module => ({ default: module.ProjectManagerModal })));
 const ConfirmDialog = lazy(() => import('./components/ConfirmDialog').then(module => ({ default: module.ConfirmDialog })));
+const NotificationSettings = lazy(() => import('./components/NotificationSettings').then(module => ({ default: module.NotificationSettings })));
 
 
 type Tab = 'tracker' | 'history' | 'settings';
@@ -232,6 +233,7 @@ function AppContent() {
                     </div>
                   </div>
                 </div>
+                <NotificationSettings />
                 <div className="bg-white rounded-lg shadow-md p-6">
                   <h3 className="text-lg font-semibold mb-4">About BuzTracker</h3>
                   <div className="text-gray-600 space-y-2">

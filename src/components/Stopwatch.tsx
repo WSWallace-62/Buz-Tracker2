@@ -84,6 +84,27 @@ export function Stopwatch({ projectId }: StopwatchProps) {
     return () => clearInterval(clockInterval);
   }, []);
 
+  // Update document title with running timer
+  useEffect(() => {
+    const defaultTitle = "BuzTracker - Time Tracker";
+
+    if (isRunning && isCurrentProject && !isPaused) {
+      const updateTitle = () => {
+        document.title = `BuzTracker | ${formatDuration(getCurrentElapsed())}`;
+      };
+
+      const titleInterval = setInterval(updateTitle, 1000);
+      updateTitle(); // Update immediately
+
+      return () => {
+        clearInterval(titleInterval);
+        document.title = defaultTitle;
+      };
+    } else {
+      document.title = defaultTitle;
+    }
+  }, [isRunning, isCurrentProject, isPaused, getCurrentElapsed]);
+
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (!document.hidden && isRunning && !isPaused) {
