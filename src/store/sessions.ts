@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { db, Session, RunningSession } from '../db/dexie';
 import { getAuth } from 'firebase/auth';
 import { useProjectsStore } from './projects';
+import { useNotificationSettingsStore } from './notificationSettings';
 import {
   addDoc,
   collection,
@@ -18,6 +19,95 @@ import { startOfDay, endOfDay } from '../utils/time';
 
 // Keep track of the unsubscribe function
 let unsubscribeFromFirestore: Unsubscribe | null = null;
+
+// --- Media Session API Integration ---
+
+// Holds the interval ID for updating the media session position.
+let mediaSessionInterval: NodeJS.Timeout | null = null;
+
+/**
+ * Clears all Media Session metadata and handlers.
+ */
+const clearMediaSession = () => {
+  if ('mediaSession' in navigator) {
+    if (mediaSessionInterval) {
+      clearInterval(mediaSessionInterval);
+      mediaSessionInterval = null;
+    }
+    navigator.mediaSession.metadata = null;
+    navigator.mediaSession.playbackState = 'none';
+    navigator.mediaSession.setActionHandler('play', null);
+    navigator.mediaSession.setActionHandler('pause', null);
+    navigator.mediaSession.setPositionState(null);
+  }
+};
+
+/**
+ * Updates the Media Session state based on the timer's action.
+ * @param action The action being performed ('start', 'pause', 'stop').
+ * @param session The current running session object.
+ */
+const updateMediaSession = (
+  action: 'start' | 'pause' | 'stop',
+  session: RunningSession | null
+) => {
+  if (!('mediaSession' in navigator)) {
+    return; // Media Session API not supported.
+  }
+
+  // Check if the feature is enabled in settings.
+  const { settings } = useNotificationSettingsStore.getState();
+  if (!settings.showLiveTimer) {
+    clearMediaSession();
+    return;
+  }
+
+  if (action === 'stop' || !session) {
+    clearMediaSession();
+    return;
+  }
+
+  // Get project name for the metadata title.
+  const { projects } = useProjectsStore.getState();
+  const project = projects.find(p => p.id === session.projectId);
+  const projectName = project?.name || 'BuzTracker Project';
+
+  // Set the metadata that shows up on the lock screen/media controls.
+  navigator.mediaSession.metadata = new MediaMetadata({
+    title: projectName,
+    artist: 'BuzTracker',
+    album: 'Time Tracking Sessions',
+  });
+
+  // Get actions from the store to hook into the media controls.
+  const { resumeSession, pauseSession, getCurrentElapsed } = useSessionsStore.getState();
+
+  navigator.mediaSession.setActionHandler('play', () => resumeSession());
+  navigator.mediaSession.setActionHandler('pause', () => pauseSession());
+
+  // Function to update the timer position in the media notification.
+  const updatePosition = () => {
+    const elapsedSeconds = Math.max(0, getCurrentElapsed() / 1000);
+    navigator.mediaSession.setPositionState({
+      duration: elapsedSeconds,
+      playbackRate: 1,
+      position: elapsedSeconds,
+    });
+  };
+
+  if (action === 'start') {
+    navigator.mediaSession.playbackState = 'playing';
+    if (mediaSessionInterval) clearInterval(mediaSessionInterval);
+    mediaSessionInterval = setInterval(updatePosition, 1000);
+    updatePosition(); // Update immediately
+  } else if (action === 'pause') {
+    navigator.mediaSession.playbackState = 'paused';
+    // When paused, stop the interval but update the position one last time.
+    if (mediaSessionInterval) clearInterval(mediaSessionInterval);
+    mediaSessionInterval = null;
+    updatePosition();
+  }
+};
 
 interface SessionsState {
   sessions: Session[];
@@ -332,7 +422,30 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
 
       await db.runningSession.clear();
       const newId = await db.runningSession.add(runningSession);
-      set({ runningSession: { ...runningSession, id: newId as number } });
+      const newRunningSession = { ...runningSession, id: newId as number };
+      set({ runningSession: newRunningSession });
+      updateMediaSession('start', newRunningSession);
+
+      // Also sync running session status to Firestore
+      const user = getAuth().currentUser;
+      if (user && firestoreDb) {
+        try {
+          const projects = useProjectsStore.getState().projects;
+          const project = projects.find(p => p.id === projectId);
+
+          if (project?.firestoreId) {
+            const runningSessionDocRef = doc(firestoreDb, 'users', user.uid, 'status', 'runningSession');
+            await setDoc(runningSessionDocRef, {
+              projectId: project.firestoreId,
+              projectName: project.name,
+              startTs: newRunningSession.startTs,
+              note: newRunningSession.note || ''
+            });
+          }
+        } catch (fsError) {
+          console.error("Failed to sync running session status to Firestore:", fsError);
+        }
+      }
     } catch (error) {
       set({ error: (error as Error).message });
     }
@@ -342,6 +455,18 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
     try {
       await db.runningSession.clear();
       set({ runningSession: null });
+      updateMediaSession('stop', null);
+
+      // Also delete running session status from Firestore
+      const user = getAuth().currentUser;
+      if (user && firestoreDb) {
+        try {
+          const runningSessionDocRef = doc(firestoreDb, 'users', user.uid, 'status', 'runningSession');
+          await deleteDoc(runningSessionDocRef);
+        } catch (fsError) {
+          console.error("Failed to delete running session status from Firestore:", fsError);
+        }
+      }
     } catch (error) {
       set({ error: (error as Error).message });
     }
@@ -374,7 +499,18 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
       await get().createSession(newSessionData);
       await db.runningSession.clear();
       set({ runningSession: null });
+      updateMediaSession('stop', null);
 
+      // Also delete running session status from Firestore
+      const user = getAuth().currentUser;
+      if (user && firestoreDb) {
+        try {
+          const runningSessionDocRef = doc(firestoreDb, 'users', user.uid, 'status', 'runningSession');
+          await deleteDoc(runningSessionDocRef);
+        } catch (fsError) {
+          console.error("Failed to delete running session status from Firestore:", fsError);
+        }
+      }
     } catch (error) {
       set({ error: (error as Error).message });
     }
@@ -387,7 +523,9 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
       if (running && !running.isPaused) {
         const updates = { isPaused: true, pauseStartTime: Date.now() };
         await db.runningSession.update(running.id!, updates);
-        set({ runningSession: { ...running, ...updates } });
+        const updatedSession = { ...running, ...updates };
+        set({ runningSession: updatedSession });
+        updateMediaSession('pause', updatedSession);
       }
     } catch (error) {
       set({ error: (error as Error).message });
@@ -407,7 +545,9 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
           totalPausedTime: newTotalPausedTime,
         };
         await db.runningSession.update(running.id!, updates);
-        set({ runningSession: { ...running, ...updates } });
+        const updatedSession = { ...running, ...updates };
+        set({ runningSession: updatedSession });
+        updateMediaSession('start', updatedSession);
       }
     } catch (error) {
       set({ error: (error as Error).message });

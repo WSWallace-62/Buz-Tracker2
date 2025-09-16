@@ -25,6 +25,10 @@ export interface Settings {
   lastProjectId?: number
   theme: 'light' | 'dark'
   stopwatchPrecisionMs: number
+  // New fields for notification settings
+  showLiveTimer: boolean
+  enableSmartReminders: boolean
+  reminderThresholdHours: number
 }
 
 // --- Updated RunningSession Interface ---
@@ -64,7 +68,10 @@ export class BuzTrackerDB extends Dexie {
       if (settingsCount === 0) {
         await this.settings.add({
           theme: 'light',
-          stopwatchPrecisionMs: 100
+          stopwatchPrecisionMs: 100,
+          showLiveTimer: true,
+          enableSmartReminders: false,
+          reminderThresholdHours: 4
         })
       }
 
