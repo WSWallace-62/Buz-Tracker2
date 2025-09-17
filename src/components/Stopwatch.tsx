@@ -3,6 +3,8 @@ import React, { useEffect, useState, useRef } from 'react'
 import { useSessionsStore } from '../store/sessions'
 import { useUIStore } from '../store/ui'
 import { formatDuration, formatDate, formatTime } from '../utils/time'
+import { useNotificationSettingsStore } from '../store/notificationSettings';
+import { requestNotificationPermission } from '../notifications';
 
 interface StopwatchProps {
   projectId: number | null
@@ -21,6 +23,7 @@ export function Stopwatch({ projectId }: StopwatchProps) {
   } = useSessionsStore()
   
   const { showConfirm, showToast } = useUIStore()
+  const { settings: notificationSettings, loadSettings: loadNotificationSettings } = useNotificationSettingsStore();
   const [elapsed, setElapsed] = useState(0)
   const [note, setNote] = useState('')
   const intervalRef = useRef<NodeJS.Timeout>()
@@ -36,7 +39,8 @@ export function Stopwatch({ projectId }: StopwatchProps) {
 
   useEffect(() => {
     loadRunningSession()
-  }, [loadRunningSession])
+    loadNotificationSettings();
+  }, [loadRunningSession, loadNotificationSettings])
 
   useEffect(() => {
     if (runningSession?.note && !isRunning) {
@@ -73,6 +77,37 @@ export function Stopwatch({ projectId }: StopwatchProps) {
       }
     }
   }, [isRunning, isCurrentProject, isPaused, getCurrentElapsed])
+
+  useEffect(() => {
+    if (
+      isRunning &&
+      isCurrentProject &&
+      !isPaused &&
+      notificationSettings.enableSmartReminders
+    ) {
+      const reminderInterval = setInterval(async () => {
+        const elapsedSeconds = getCurrentElapsed() / 1000;
+        const reminderThresholdSeconds = 60; // 1 minute for testing
+  
+        if (elapsedSeconds >= reminderThresholdSeconds) {
+          const token = await requestNotificationPermission();
+          if (token) {
+            new Notification('BuzTracker', {
+              body: 'Your timer has been running for a while. Dont forget to take a break!',
+            });
+          }
+        }
+      }, 1000 * 10); // Check every 10 seconds for testing
+  
+      return () => clearInterval(reminderInterval);
+    }
+  }, [
+    isRunning,
+    isCurrentProject,
+    isPaused,
+    notificationSettings.enableSmartReminders,
+    getCurrentElapsed,
+  ]);
 
   // --- New useEffect to update clock and date every second ---
   useEffect(() => {
@@ -284,3 +319,4 @@ export function Stopwatch({ projectId }: StopwatchProps) {
     </div>
   )
 }
+""
