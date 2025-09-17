@@ -5,7 +5,7 @@ import { doc, setDoc } from 'firebase/firestore';
 
 // IMPORTANT: Replace this with your actual VAPID key from the Firebase console.
 // This key is used to authenticate your app with web push services.
-const VAPID_KEY = 'YOUR_PUBLIC_VAPID_KEY_HERE';
+const VAPID_KEY = 'BI3FpN9JNmJHVaJxz1Nhr9zSbXK_VpYzmW-Swq3KvKHYqzByB3IYblTn-lPt4dqAyhaAcjIcyM4eltqBufEpsss';
 
 /**
  * Requests permission from the user to show notifications and then
