@@ -1,4 +1,4 @@
-// wswallace-62/buz-tracker2/Buz-Tracker2-Logouts-still-happening/src/App.tsx
+// src/App.tsx
 import { useEffect, useState, lazy, Suspense, useCallback } from 'react';
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
@@ -6,7 +6,7 @@ import { useProjectsStore } from './store/projects';
 import { useSessionsStore } from './store/sessions';
 import { useUIStore } from './store/ui';
 import { useAuthStore } from './store/auth';
-import { db, clearDatabase } from './db/dexie'; // Import clearDatabase
+import { db, clearDatabase } from './db/dexie';
 import { auth } from './firebase';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { ProjectSelect } from './components/ProjectSelect';
@@ -14,7 +14,7 @@ import { Stopwatch } from './components/Stopwatch';
 import { SessionsTable } from './components/SessionsTable';
 import { Toast } from './components/Toast';
 import { InstallButton } from './pwa/InstallButton';
-import { getTotalDuration, formatDurationHHMM } from './utils/time';
+import { getTotalDuration, formatDurationHHMM, formatDuration } from './utils/time'; // Import formatDuration
 import './styles.css';
 
 // Lazy load all non-critical/route-specific components
@@ -40,7 +40,7 @@ export function App() {
 function AppContent() {
   const isOnline = useOnlineStatus();
   const { reconcileProjects, startProjectSync, stopProjectSync } = useProjectsStore();
-  const { loadSessions, loadRunningSession, getTodaySessions, startSync, stopSync } = useSessionsStore();
+  const { getTodaySessions, startSync, stopSync } = useSessionsStore(); // Removed unused imports
   const { currentProjectId, setCurrentProject, openAddEntryModal } = useUIStore();
   const { user, setUser } = useAuthStore();
   const [isLoading, setIsLoading] = useState(true);
@@ -49,6 +49,8 @@ function AppContent() {
 
   const activeTab: Tab = location.pathname === '/history' ? 'history' : location.pathname === '/settings' ? 'settings' : 'tracker';
 
+  const { runningSession, getCurrentElapsed, loadSessions, loadRunningSession } = useSessionsStore();
+
   const initializeApp = useCallback(async (currentUser: User | null) => {
     setUser(currentUser);
     setIsLoading(true);
@@ -56,8 +58,8 @@ function AppContent() {
     if (currentUser) {
       setIsGuest(false);
       await reconcileProjects();
-      startProjectSync(); // Start listening for real-time project changes
-      startSync(); // This one is for sessions
+      startProjectSync();
+      startSync();
     } else if (isGuest) {
       await loadSessions();
     }
@@ -78,37 +80,49 @@ function AppContent() {
     
     return () => {
       unsubscribe();
-      stopProjectSync(); // Stop the project listener on cleanup
+      stopProjectSync();
       stopSync();
     };
   }, [initializeApp, stopProjectSync, stopSync]);
+
+  // --- ADD THIS NEW useEffect BLOCK ---
+  useEffect(() => {
+    const defaultTitle = "BuzTracker - Time Tracker";
+    if (runningSession?.running && !runningSession.isPaused) {
+      const updateTitle = () => {
+        document.title = `BuzTracker | ${formatDuration(getCurrentElapsed())}`;
+      };
+
+      const titleInterval = setInterval(updateTitle, 1000);
+      updateTitle(); // Update immediately
+
+      return () => {
+        clearInterval(titleInterval);
+        document.title = defaultTitle;
+      };
+    } else {
+      document.title = defaultTitle;
+    }
+  }, [runningSession, getCurrentElapsed]);
+  // --- END OF NEW BLOCK ---
 
   const handleLogin = () => {
     setIsGuest(true);
   };
 
   const handleLogout = async () => {
-    // 1. Stop all real-time sync listeners to prevent errors
     stopProjectSync();
     stopSync();
-
-    // 2. Sign out from Firebase
     if (auth) {
       await signOut(auth);
     }
-    
-    // 3. Completely wipe the local database to ensure no data leaks
     await clearDatabase();
-
-    // 4. Reset all global state stores to their initial values
     useProjectsStore.setState({ projects: [], isLoading: false, error: null });
     useSessionsStore.setState({ sessions: [], runningSession: null, isLoading: true, error: null });
     useUIStore.setState({ currentProjectId: null });
     setUser(null);
     setIsGuest(false);
-    
-    // 5. Re-initialize default Dexie data (like the default project) for a fresh start
-    await db.on.ready.fire(db); // <-- FIX 1: Pass db instance
+    await db.on.ready.fire(db);
   };
 
   const loadingSpinner = (
@@ -257,4 +271,4 @@ function AppContent() {
       <Toast />
     </div>
   );
-} // <-- FIX 2: Removed extra curly brace from here
+}
