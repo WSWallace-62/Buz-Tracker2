@@ -52,8 +52,9 @@ export const useNotificationSettingsStore = create<NotificationSettingsState>((s
           isLoading: false,
         });
       } else {
-        // This case is unlikely if the DB initializes defaults correctly, but it's here for robustness.
-        set({ isLoading: false, error: 'Settings not found in the database.' });
+        // No settings found in DB, so just finish loading.
+        // The component will use the initial default state.
+        set({ isLoading: false });
       }
     } catch (error) {
       set({ error: (error as Error).message, isLoading: false });
