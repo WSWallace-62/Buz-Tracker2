@@ -1,5 +1,5 @@
 // src/App.tsx
-import { useEffect, useState, lazy, Suspense, useCallback, useRef } from 'react'; // Add useRef
+import { useEffect, useState, lazy, Suspense, useCallback, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
 import { useProjectsStore } from './store/projects';
@@ -15,7 +15,7 @@ import { SessionsTable } from './components/SessionsTable';
 import { Toast } from './components/Toast';
 import { InstallButton } from './pwa/InstallButton';
 import { getTotalDuration, formatDurationHHMM, formatDuration } from './utils/time';
-import { audioManager } from './utils/audioManager'; // Add this import
+import { audioManager } from './utils/audioManager';
 import './styles.css';
 
 // Lazy load all non-critical/route-specific components
@@ -105,12 +105,34 @@ function AppContent() {
     }
   }, [runningSession, getCurrentElapsed]);
   
-  // --- ADD THIS NEW BLOCK for the audio element ---
   const audioRef = useRef<HTMLAudioElement>(null);
   useEffect(() => {
     if (audioRef.current) {
       audioManager.element = audioRef.current;
     }
+  }, []);
+
+  // --- ADD THIS NEW useEffect BLOCK ---
+  // Unlocks audio on the first user interaction.
+  useEffect(() => {
+    const unlockAudio = () => {
+      audioManager.unlock();
+      // These listeners only need to run once, so we remove them after the first interaction.
+      window.removeEventListener('click', unlockAudio);
+      window.removeEventListener('touchstart', unlockAudio);
+      window.removeEventListener('keydown', unlockAudio);
+    };
+
+    window.addEventListener('click', unlockAudio);
+    window.addEventListener('touchstart', unlockAudio);
+    window.addEventListener('keydown', unlockAudio);
+
+    // Cleanup function to remove listeners if the component unmounts before interaction.
+    return () => {
+      window.removeEventListener('click', unlockAudio);
+      window.removeEventListener('touchstart', unlockAudio);
+      window.removeEventListener('keydown', unlockAudio);
+    };
   }, []);
   // --- END OF NEW BLOCK ---
 
@@ -271,7 +293,6 @@ function AppContent() {
         </Suspense>
       </main>
 
-      {/* --- ADD THIS NEW AUDIO ELEMENT --- */}
       <audio ref={audioRef} src="/silent.mp3" loop hidden />
 
       <Suspense fallback={null}>
