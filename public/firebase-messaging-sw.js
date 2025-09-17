@@ -7,7 +7,7 @@ importScripts('https://www.gstatic.com/firebasejs/9.15.0/firebase-messaging-comp
 // NOTE: This file is not processed by Vite, so we cannot use import.meta.env.
 // The VITE_FIREBASE_API_KEY from your .env file needs to be manually inserted here.
 const firebaseConfig = {
-  apiKey: "YOUR_FIREBASE_API_KEY_HERE", // <<<<<<< PLACEHOLDER
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: "buz-tracker-fd3e3.firebaseapp.com",
   projectId: "buz-tracker-fd3e3",
   storageBucket: "buz-tracker-fd3e3.appspot.com",

@@ -13,9 +13,11 @@ import {
   query,
   Unsubscribe,
   writeBatch,
+  setDoc,
 } from 'firebase/firestore';
 import { db as firestoreDb } from '../firebase';
 import { startOfDay, endOfDay } from '../utils/time';
+import { audioManager } from '../utils/audioManager';
 
 // Keep track of the unsubscribe function
 let unsubscribeFromFirestore: Unsubscribe | null = null;
@@ -38,7 +40,7 @@ const clearMediaSession = () => {
     navigator.mediaSession.playbackState = 'none';
     navigator.mediaSession.setActionHandler('play', null);
     navigator.mediaSession.setActionHandler('pause', null);
-    navigator.mediaSession.setPositionState(null);
+    navigator.mediaSession.setPositionState(undefined);
   }
 };
 
@@ -403,6 +405,8 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
 
   startSession: async (projectId, note) => {
     try {
+      audioManager.play(); // Play silent audio immediately on user interaction
+
       const existing = await db.runningSession.toCollection().first();
       if (existing) {
         throw new Error('A session is already running. Please stop it first.');
@@ -414,7 +418,6 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
         projectId,
         startTs: now,
         note,
-        // --- Initialize new fields ---
         isPaused: false,
         pauseStartTime: null,
         totalPausedTime: 0,
@@ -426,7 +429,6 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
       set({ runningSession: newRunningSession });
       updateMediaSession('start', newRunningSession);
 
-      // Also sync running session status to Firestore
       const user = getAuth().currentUser;
       if (user && firestoreDb) {
         try {
@@ -448,6 +450,7 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
       }
     } catch (error) {
       set({ error: (error as Error).message });
+      audioManager.pause(); // Ensure audio is paused if start fails
     }
   },
 
@@ -456,8 +459,8 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
       await db.runningSession.clear();
       set({ runningSession: null });
       updateMediaSession('stop', null);
+      audioManager.pause(); // Pause silent audio
 
-      // Also delete running session status from Firestore
       const user = getAuth().currentUser;
       if (user && firestoreDb) {
         try {
@@ -480,9 +483,7 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
       }
 
       const now = Date.now();
-      // --- Updated duration calculation ---
       let totalPaused = running.totalPausedTime;
-      // If stopped while paused, add the last pause duration
       if (running.isPaused && running.pauseStartTime) {
         totalPaused += (now - running.pauseStartTime);
       }
@@ -500,8 +501,8 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
       await db.runningSession.clear();
       set({ runningSession: null });
       updateMediaSession('stop', null);
+      audioManager.pause(); // Pause silent audio
 
-      // Also delete running session status from Firestore
       const user = getAuth().currentUser;
       if (user && firestoreDb) {
         try {
@@ -516,7 +517,6 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
     }
   },
 
-  // --- New Pause Action ---
   pauseSession: async () => {
     try {
       const running = get().runningSession;
@@ -526,15 +526,17 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
         const updatedSession = { ...running, ...updates };
         set({ runningSession: updatedSession });
         updateMediaSession('pause', updatedSession);
+        audioManager.pause(); // Pause silent audio
       }
     } catch (error) {
       set({ error: (error as Error).message });
     }
   },
 
-  // --- New Resume Action ---
   resumeSession: async () => {
     try {
+      audioManager.play(); // Play silent audio immediately on user interaction
+
       const running = get().runningSession;
       if (running && running.isPaused && running.pauseStartTime) {
         const pausedDuration = Date.now() - running.pauseStartTime;
@@ -551,6 +553,7 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
       }
     } catch (error) {
       set({ error: (error as Error).message });
+      audioManager.pause(); // Ensure audio is paused if resume fails
     }
   },
 
@@ -558,9 +561,7 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
     const running = get().runningSession;
     if (!running) return 0;
     
-    // --- Updated elapsed time calculation ---
     const elapsed = (Date.now() - running.startTs) - running.totalPausedTime;
-    // If paused, don't add the time since the last pause
     if (running.isPaused && running.pauseStartTime) {
       const currentPauseDuration = Date.now() - running.pauseStartTime;
       return elapsed - currentPauseDuration;

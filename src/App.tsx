@@ -1,5 +1,5 @@
 // src/App.tsx
-import { useEffect, useState, lazy, Suspense, useCallback } from 'react';
+import { useEffect, useState, lazy, Suspense, useCallback, useRef } from 'react'; // Add useRef
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
 import { useProjectsStore } from './store/projects';
@@ -14,7 +14,8 @@ import { Stopwatch } from './components/Stopwatch';
 import { SessionsTable } from './components/SessionsTable';
 import { Toast } from './components/Toast';
 import { InstallButton } from './pwa/InstallButton';
-import { getTotalDuration, formatDurationHHMM, formatDuration } from './utils/time'; // Import formatDuration
+import { getTotalDuration, formatDurationHHMM, formatDuration } from './utils/time';
+import { audioManager } from './utils/audioManager'; // Add this import
 import './styles.css';
 
 // Lazy load all non-critical/route-specific components
@@ -40,7 +41,7 @@ export function App() {
 function AppContent() {
   const isOnline = useOnlineStatus();
   const { reconcileProjects, startProjectSync, stopProjectSync } = useProjectsStore();
-  const { getTodaySessions, startSync, stopSync } = useSessionsStore(); // Removed unused imports
+  const { getTodaySessions, startSync, stopSync } = useSessionsStore();
   const { currentProjectId, setCurrentProject, openAddEntryModal } = useUIStore();
   const { user, setUser } = useAuthStore();
   const [isLoading, setIsLoading] = useState(true);
@@ -85,7 +86,6 @@ function AppContent() {
     };
   }, [initializeApp, stopProjectSync, stopSync]);
 
-  // --- ADD THIS NEW useEffect BLOCK ---
   useEffect(() => {
     const defaultTitle = "BuzTracker - Time Tracker";
     if (runningSession?.running && !runningSession.isPaused) {
@@ -94,7 +94,7 @@ function AppContent() {
       };
 
       const titleInterval = setInterval(updateTitle, 1000);
-      updateTitle(); // Update immediately
+      updateTitle();
 
       return () => {
         clearInterval(titleInterval);
@@ -104,6 +104,14 @@ function AppContent() {
       document.title = defaultTitle;
     }
   }, [runningSession, getCurrentElapsed]);
+  
+  // --- ADD THIS NEW BLOCK for the audio element ---
+  const audioRef = useRef<HTMLAudioElement>(null);
+  useEffect(() => {
+    if (audioRef.current) {
+      audioManager.element = audioRef.current;
+    }
+  }, []);
   // --- END OF NEW BLOCK ---
 
   const handleLogin = () => {
@@ -262,6 +270,9 @@ function AppContent() {
           </Routes>
         </Suspense>
       </main>
+
+      {/* --- ADD THIS NEW AUDIO ELEMENT --- */}
+      <audio ref={audioRef} src="/silent.mp3" loop hidden />
 
       <Suspense fallback={null}>
         <AddEntryModal />
