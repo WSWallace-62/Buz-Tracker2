@@ -201,7 +201,7 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
                 const logicalDuplicate = await db.sessions.where({
                   projectId: localProject.id,
                   start: firestoreSessionData.start,
-                }).and(s => !s.firestoreId).first();
+                }).first();
 
                 if (logicalDuplicate?.id) {
                   // Found an offline session. Link it instead of creating a new one.
@@ -210,7 +210,7 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
                 } else {
                   // Genuinely new session, add it.
                   console.log(`Sync: Adding new session from Firestore to Dexie ${firestoreId}`);
-                  await db.sessions.add({
+                  await db.sessions.put({
                     ...firestoreSessionData,
                     firestoreId,
                     projectId: localProject.id,
