@@ -1,12 +1,12 @@
-// wswallace-62/buz-tracker2/Buz-Tracker2-Logouts-still-happening/src/App.tsx
-import { useEffect, useState, lazy, Suspense, useCallback } from 'react';
+// src/App.tsx
+import { useEffect, useState, lazy, Suspense, useCallback, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
 import { useProjectsStore } from './store/projects';
 import { useSessionsStore } from './store/sessions';
 import { useUIStore } from './store/ui';
 import { useAuthStore } from './store/auth';
-import { db, clearDatabase } from './db/dexie'; // Import clearDatabase
+import { db, clearDatabase } from './db/dexie';
 import { auth } from './firebase';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { ProjectSelect } from './components/ProjectSelect';
@@ -14,7 +14,8 @@ import { Stopwatch } from './components/Stopwatch';
 import { SessionsTable } from './components/SessionsTable';
 import { Toast } from './components/Toast';
 import { InstallButton } from './pwa/InstallButton';
-import { getTotalDuration, formatDurationHHMM } from './utils/time';
+import { getTotalDuration, formatDurationHHMM, formatDuration } from './utils/time';
+import { audioManager } from './utils/audioManager';
 import './styles.css';
 
 // Lazy load all non-critical/route-specific components
@@ -24,6 +25,7 @@ const Auth = lazy(() => import('./components/Auth').then(module => ({ default: m
 const AddEntryModal = lazy(() => import('./components/AddEntryModal').then(module => ({ default: module.AddEntryModal })));
 const ProjectManagerModal = lazy(() => import('./components/ProjectManagerModal').then(module => ({ default: module.ProjectManagerModal })));
 const ConfirmDialog = lazy(() => import('./components/ConfirmDialog').then(module => ({ default: module.ConfirmDialog })));
+const NotificationSettings = lazy(() => import('./components/NotificationSettings'));
 
 
 type Tab = 'tracker' | 'history' | 'settings';
@@ -39,7 +41,7 @@ export function App() {
 function AppContent() {
   const isOnline = useOnlineStatus();
   const { reconcileProjects, startProjectSync, stopProjectSync } = useProjectsStore();
-  const { loadSessions, loadRunningSession, getTodaySessions, startSync, stopSync } = useSessionsStore();
+  const { getTodaySessions, startSync, stopSync } = useSessionsStore();
   const { currentProjectId, setCurrentProject, openAddEntryModal } = useUIStore();
   const { user, setUser } = useAuthStore();
   const [isLoading, setIsLoading] = useState(true);
@@ -48,6 +50,8 @@ function AppContent() {
 
   const activeTab: Tab = location.pathname === '/history' ? 'history' : location.pathname === '/settings' ? 'settings' : 'tracker';
 
+  const { runningSession, getCurrentElapsed, loadSessions, loadRunningSession } = useSessionsStore();
+
   const initializeApp = useCallback(async (currentUser: User | null) => {
     setUser(currentUser);
     setIsLoading(true);
@@ -55,8 +59,8 @@ function AppContent() {
     if (currentUser) {
       setIsGuest(false);
       await reconcileProjects();
-      startProjectSync(); // Start listening for real-time project changes
-      startSync(); // This one is for sessions
+      startProjectSync();
+      startSync();
     } else if (isGuest) {
       await loadSessions();
     }
@@ -77,37 +81,78 @@ function AppContent() {
     
     return () => {
       unsubscribe();
-      stopProjectSync(); // Stop the project listener on cleanup
+      stopProjectSync();
       stopSync();
     };
   }, [initializeApp, stopProjectSync, stopSync]);
+
+  useEffect(() => {
+    const defaultTitle = "BuzTracker - Time Tracker";
+    if (runningSession?.running && !runningSession.isPaused) {
+      const updateTitle = () => {
+        document.title = `BuzTracker | ${formatDuration(getCurrentElapsed())}`;
+      };
+
+      const titleInterval = setInterval(updateTitle, 1000);
+      updateTitle();
+
+      return () => {
+        clearInterval(titleInterval);
+        document.title = defaultTitle;
+      };
+    } else {
+      document.title = defaultTitle;
+    }
+  }, [runningSession, getCurrentElapsed]);
+  
+  const audioRef = useRef<HTMLAudioElement>(null);
+  useEffect(() => {
+    if (audioRef.current) {
+      audioManager.element = audioRef.current;
+    }
+  }, []);
+
+  // --- ADD THIS NEW useEffect BLOCK ---
+  // Unlocks audio on the first user interaction.
+  useEffect(() => {
+    const unlockAudio = () => {
+      audioManager.unlock();
+      // These listeners only need to run once, so we remove them after the first interaction.
+      window.removeEventListener('click', unlockAudio);
+      window.removeEventListener('touchstart', unlockAudio);
+      window.removeEventListener('keydown', unlockAudio);
+    };
+
+    window.addEventListener('click', unlockAudio);
+    window.addEventListener('touchstart', unlockAudio);
+    window.addEventListener('keydown', unlockAudio);
+
+    // Cleanup function to remove listeners if the component unmounts before interaction.
+    return () => {
+      window.removeEventListener('click', unlockAudio);
+      window.removeEventListener('touchstart', unlockAudio);
+      window.removeEventListener('keydown', unlockAudio);
+    };
+  }, []);
+  // --- END OF NEW BLOCK ---
 
   const handleLogin = () => {
     setIsGuest(true);
   };
 
   const handleLogout = async () => {
-    // 1. Stop all real-time sync listeners to prevent errors
     stopProjectSync();
     stopSync();
-
-    // 2. Sign out from Firebase
     if (auth) {
       await signOut(auth);
     }
-    
-    // 3. Completely wipe the local database to ensure no data leaks
     await clearDatabase();
-
-    // 4. Reset all global state stores to their initial values
     useProjectsStore.setState({ projects: [], isLoading: false, error: null });
     useSessionsStore.setState({ sessions: [], runningSession: null, isLoading: true, error: null });
     useUIStore.setState({ currentProjectId: null });
     setUser(null);
     setIsGuest(false);
-    
-    // 5. Re-initialize default Dexie data (like the default project) for a fresh start
-    await db.on.ready.fire(db); // <-- FIX 1: Pass db instance
+    await db.on.ready.fire(db);
   };
 
   const loadingSpinner = (
@@ -232,6 +277,7 @@ function AppContent() {
                     </div>
                   </div>
                 </div>
+                <NotificationSettings />
                 <div className="bg-white rounded-lg shadow-md p-6">
                   <h3 className="text-lg font-semibold mb-4">About BuzTracker</h3>
                   <div className="text-gray-600 space-y-2">
@@ -247,6 +293,8 @@ function AppContent() {
         </Suspense>
       </main>
 
+      <audio ref={audioRef} src="/silent.mp3" loop hidden />
+
       <Suspense fallback={null}>
         <AddEntryModal />
         <ProjectManagerModal />
@@ -255,4 +303,4 @@ function AppContent() {
       <Toast />
     </div>
   );
-} // <-- FIX 2: Removed extra curly brace from here
+}

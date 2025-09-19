@@ -13,6 +13,22 @@ service cloud.firestore {
           allow read, write: if request.auth != null && request.auth.uid == userId;
         }
       }
+
+      // Allow users to manage their own FCM tokens for push notifications
+      match /fcmTokens/{tokenId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+
+      // Allow users to manage their own running session status
+      // The document ID is explicitly 'runningSession'
+      match /status/runningSession {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+
+      // Allow users to manage their own configuration settings
+      match /config/settings {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
     }
   }
 }

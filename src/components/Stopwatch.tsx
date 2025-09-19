@@ -1,11 +1,12 @@
-// wswallace-62/buz-tracker2/Buz-Tracker2-Github-errors/src/components/Stopwatch.tsx
-import React, { useEffect, useState, useRef } from 'react'
-import { useSessionsStore } from '../store/sessions'
-import { useUIStore } from '../store/ui'
-import { formatDuration, formatDate, formatTime } from '../utils/time'
+// src/components/Stopwatch.tsx
+import React, { useEffect, useState, useRef } from 'react';
+import { useSessionsStore } from '../store/sessions';
+import { useUIStore } from '../store/ui';
+import { formatDuration, formatDate, formatTime } from '../utils/time';
+import { useNotificationSettingsStore } from '../store/notificationSettings';
 
 interface StopwatchProps {
-  projectId: number | null
+  projectId: number | null;
 }
 
 export function Stopwatch({ projectId }: StopwatchProps) {
@@ -18,61 +19,63 @@ export function Stopwatch({ projectId }: StopwatchProps) {
     discardRunningSession,
     pauseSession,
     resumeSession,
-  } = useSessionsStore()
-  
-  const { showConfirm, showToast } = useUIStore()
-  const [elapsed, setElapsed] = useState(0)
-  const [note, setNote] = useState('')
-  const intervalRef = useRef<NodeJS.Timeout>()
-  const stopwatchRef = useRef<HTMLDivElement>(null)
+  } = useSessionsStore();
+
+  const { showConfirm, showToast } = useUIStore();
+  const { loadSettings: loadNotificationSettings } = useNotificationSettingsStore();
+  const [elapsed, setElapsed] = useState(0);
+  const [note, setNote] = useState('');
+  const intervalRef = useRef<NodeJS.Timeout>();
+  const stopwatchRef = useRef<HTMLDivElement>(null);
 
   // --- Add new state for current time and date ---
-  const [currentTime, setCurrentTime] = useState(formatTime(Date.now()))
-  const [currentDate, setCurrentDate] = useState(formatDate(Date.now()))
+  const [currentTime, setCurrentTime] = useState(formatTime(Date.now()));
+  const [currentDate, setCurrentDate] = useState(formatDate(Date.now()));
 
-  const isRunning = runningSession?.running === true
-  const isCurrentProject = runningSession?.projectId === projectId
-  const isPaused = isRunning && isCurrentProject && runningSession?.isPaused === true
+  const isRunning = runningSession?.running === true;
+  const isCurrentProject = runningSession?.projectId === projectId;
+  const isPaused = isRunning && isCurrentProject && runningSession?.isPaused === true;
 
   useEffect(() => {
-    loadRunningSession()
-  }, [loadRunningSession])
+    loadRunningSession();
+    loadNotificationSettings();
+  }, [loadRunningSession, loadNotificationSettings]);
 
   useEffect(() => {
     if (runningSession?.note && !isRunning) {
-      setNote(runningSession.note)
+      setNote(runningSession.note);
     } else if (runningSession?.note) {
-      setNote(runningSession.note)
+      setNote(runningSession.note);
     } else {
-      setNote('')
+      setNote('');
     }
-  }, [runningSession, isRunning])
+  }, [runningSession, isRunning]);
 
   useEffect(() => {
     if (isRunning && isCurrentProject && !isPaused) {
       const updateElapsed = () => {
-        setElapsed(getCurrentElapsed())
-      }
-      updateElapsed()
-      intervalRef.current = setInterval(updateElapsed, 100)
+        setElapsed(getCurrentElapsed());
+      };
+      updateElapsed();
+      intervalRef.current = setInterval(updateElapsed, 100);
 
       return () => {
         if (intervalRef.current) {
-          clearInterval(intervalRef.current)
+          clearInterval(intervalRef.current);
         }
-      }
+      };
     } else {
       if (intervalRef.current) {
-        clearInterval(intervalRef.current)
+        clearInterval(intervalRef.current);
       }
       if (isRunning && isCurrentProject) {
-        setElapsed(getCurrentElapsed())
+        setElapsed(getCurrentElapsed());
       }
       if (!isRunning) {
-        setElapsed(0)
+        setElapsed(0);
       }
     }
-  }, [isRunning, isCurrentProject, isPaused, getCurrentElapsed])
+  }, [isRunning, isCurrentProject, isPaused, getCurrentElapsed]);
 
   // --- New useEffect to update clock and date every second ---
   useEffect(() => {
@@ -87,18 +90,18 @@ export function Stopwatch({ projectId }: StopwatchProps) {
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (!document.hidden && isRunning && !isPaused) {
-        setElapsed(getCurrentElapsed())
+        setElapsed(getCurrentElapsed());
       }
-    }
+    };
 
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
-  }, [isRunning, isPaused, getCurrentElapsed])
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [isRunning, isPaused, getCurrentElapsed]);
 
   const handleStart = async () => {
     if (!projectId) {
-      showToast('Please select a project first', 'error')
-      return
+      showToast('Please select a project first', 'error');
+      return;
     }
     try {
       if (isRunning && !isCurrentProject) {
@@ -106,37 +109,37 @@ export function Stopwatch({ projectId }: StopwatchProps) {
           'Switch Project?',
           'A session is already running for another project. Do you want to stop it and start a new session for this project?',
           async () => {
-            await stopSession()
-            await startSession(projectId, note)
-            showToast('Session started for new project', 'success')
+            await stopSession();
+            await startSession(projectId, note);
+            showToast('Session started for new project', 'success');
           }
-        )
+        );
       } else {
-        await startSession(projectId, note)
-        showToast('Session started', 'success')
+        await startSession(projectId, note);
+        showToast('Session started', 'success');
       }
     } catch (error) {
-      showToast((error as Error).message, 'error')
+      showToast((error as Error).message, 'error');
     }
-  }
+  };
 
   const handleEnd = async () => {
     try {
-      await stopSession()
-      setNote('')
-      showToast('Session ended and saved', 'success')
+      await stopSession();
+      setNote('');
+      showToast('Session ended and saved', 'success');
     } catch (error) {
-      showToast((error as Error).message, 'error')
+      showToast((error as Error).message, 'error');
     }
-  }
+  };
 
   const handlePauseToggle = () => {
     if (isPaused) {
-      resumeSession()
+      resumeSession();
     } else {
-      pauseSession()
+      pauseSession();
     }
-  }
+  };
 
   const handleReset = () => {
     if (isRunning) {
@@ -145,41 +148,47 @@ export function Stopwatch({ projectId }: StopwatchProps) {
         'Are you sure you want to discard this running session? This action cannot be undone.',
         async () => {
           try {
-            await discardRunningSession()
-            setNote('')
-            showToast('Session discarded', 'info')
+            await discardRunningSession();
+            setNote('');
+            showToast('Session discarded', 'info');
           } catch (error) {
-            showToast((error as Error).message, 'error')
+            showToast((error as Error).message, 'error');
           }
         }
-      )
+      );
     } else {
-      setElapsed(0)
-      setNote('')
+      setElapsed(0);
+      setNote('');
     }
-  }
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.code === 'Space' && e.target === stopwatchRef.current) {
-      e.preventDefault()
+      e.preventDefault();
       if (isRunning && isCurrentProject) {
-        handleEnd()
+        handleEnd();
       } else {
-        handleStart()
+        handleStart();
       }
     }
-  }
+  };
 
-  const canStart = projectId && (!isRunning || !isCurrentProject)
-  const canEnd = isRunning && isCurrentProject
-  const canPause = isRunning && isCurrentProject
+  const canStart = projectId && (!isRunning || !isCurrentProject);
+  const canEnd = isRunning && isCurrentProject;
+  const canPause = isRunning && isCurrentProject;
 
   return (
-    <div 
+    <div
       ref={stopwatchRef}
       className={`
         p-6 bg-white rounded-lg shadow-md border-2 transition-colors duration-200 focus:outline-none
-        ${isRunning && isCurrentProject ? (isPaused ? 'border-yellow-500 bg-yellow-50' : 'border-green-500 bg-green-50') : 'border-gray-200'}
+        ${
+          isRunning && isCurrentProject
+            ? isPaused
+              ? 'border-yellow-500 bg-yellow-50'
+              : 'border-green-500 bg-green-50'
+            : 'border-gray-200'
+        }
       `}
       tabIndex={0}
       onKeyDown={handleKeyDown}
@@ -195,14 +204,20 @@ export function Stopwatch({ projectId }: StopwatchProps) {
           {currentDate}
         </div>
       </div>
-      
+
       <div className="text-center pt-8">
-        <div className={`text-4xl font-mono font-bold mb-4 ${
-          isRunning && isCurrentProject ? (isPaused ? 'text-yellow-700' : 'text-green-700') : 'text-gray-700'
-        }`}>
+        <div
+          className={`text-4xl font-mono font-bold mb-4 ${
+            isRunning && isCurrentProject
+              ? isPaused
+                ? 'text-yellow-700'
+                : 'text-green-700'
+              : 'text-gray-700'
+          }`}
+        >
           {formatDuration(isRunning && isCurrentProject ? elapsed : 0)}
         </div>
-        
+
         <textarea
           value={note}
           onChange={(e) => setNote(e.target.value)}
@@ -217,29 +232,31 @@ export function Stopwatch({ projectId }: StopwatchProps) {
             disabled={!canStart}
             className={`
               px-4 sm:px-6 py-2 rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2
-              ${canStart
-                ? 'bg-green-600 text-white hover:bg-green-700 focus:ring-green-500'
-                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              ${
+                canStart
+                  ? 'bg-green-600 text-white hover:bg-green-700 focus:ring-green-500'
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
               }
             `}
             aria-label="Start timer"
           >
             {isRunning && !isCurrentProject ? 'Switch & Start' : 'Start'}
           </button>
-          
+
           <button
             onClick={handlePauseToggle}
             disabled={!canPause}
             className={`
               px-4 sm:px-6 py-2 rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2
-              ${canPause
-                ? isPaused 
-                  ? 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500' 
-                  : 'bg-yellow-500 text-white hover:bg-yellow-600 focus:ring-yellow-500'
-                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              ${
+                canPause
+                  ? isPaused
+                    ? 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500'
+                    : 'bg-yellow-500 text-white hover:bg-yellow-600 focus:ring-yellow-500'
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
               }
             `}
-            aria-label={isPaused ? "Resume timer" : "Pause timer"}
+            aria-label={isPaused ? 'Resume timer' : 'Pause timer'}
           >
             {isPaused ? 'Resume' : 'Pause'}
           </button>
@@ -254,15 +271,16 @@ export function Stopwatch({ projectId }: StopwatchProps) {
           >
             Reset
           </button>
-          
+
           <button
             onClick={handleEnd}
             disabled={!canEnd}
             className={`
               px-4 sm:px-6 py-2 rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2
-              ${canEnd
-                ? 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500'
-                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              ${
+                canEnd
+                  ? 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500'
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
               }
             `}
             aria-label="End timer"
@@ -282,5 +300,5 @@ export function Stopwatch({ projectId }: StopwatchProps) {
         </p>
       </div>
     </div>
-  )
+  );
 }
