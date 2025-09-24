@@ -4,12 +4,8 @@ import { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db as dexieDB } from '../db/dexie';
-import { db as firestoreDB } from '../firebase';
-import { collection, addDoc, getDocs, query, where } from 'firebase/firestore';
 import { useSessionsStore } from '../store/sessions';
 import { useProjectsStore } from '../store/projects';
-import { useUIStore } from '../store/ui';
-import { useAuthStore } from '../store/auth';
 import { getDateRanges, formatDurationHours, formatDate } from '../utils/time';
 import { SessionsTable } from './SessionsTable';
 import { SessionsReport } from './SessionsReport';
@@ -23,7 +19,6 @@ import {
   Legend
 } from 'chart.js';
 import { Bar } from 'react-chartjs-2';
-import Papa from 'papaparse';
 import { useWindowWidth } from '../hooks/useWindowWidth';
 
 ChartJS.register(
@@ -41,8 +36,6 @@ type GroupBy = 'day' | 'project';
 export function HistoryPanel() {
   const { getTotalDuration } = useSessionsStore();
   const { projects } = useProjectsStore();
-  const { showToast } = useUIStore();
-  const { user } = useAuthStore();
   const windowWidth = useWindowWidth();
 
   const [dateFilter, setDateFilter] = useState<DateFilter>('thisYear');
@@ -50,7 +43,6 @@ export function HistoryPanel() {
   const [customEnd, setCustomEnd] = useState('');
   const [selectedProjectIds, setSelectedProjectIds] = useState<number[]>([]);
   const [groupBy, setGroupBy] = useState<GroupBy>('day');
-  const [showChart, setShowChart] = useState(true);
   const [sortOrder, setSortOrder] = useState<'date-desc' | 'date-asc' | 'start-desc' | 'start-asc'>('date-desc');
   const [noteFilter, setNoteFilter] = useState('');
   const [showReport, setShowReport] = useState(false);
@@ -248,145 +240,6 @@ export function HistoryPanel() {
     setSelectedProjectIds([]);
   };
 
-  const exportCSV = () => {
-    if (filteredSessions.length === 0) {
-      showToast('No sessions to export', 'info');
-      return;
-    }
-
-    const headers = ['Date', 'Start', 'Stop', 'Duration (hours)', 'Project', 'Note'];
-    const rows = filteredSessions.map(session => {
-      const project = projects.find(p => p.id === session.projectId);
-      return [
-        formatDate(session.start),
-        new Date(session.start).toLocaleTimeString(),
-        session.stop ? new Date(session.stop).toLocaleTimeString() : '',
-        formatDurationHours(session.durationMs),
-        project?.name || 'Unknown',
-        session.note || ''
-      ];
-    });
-
-    const csvContent = [headers, ...rows]
-      .map(row => row.map(cell => `"${cell}"`).join(','))
-      .join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `buztracker-sessions-${formatDate(Date.now())}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-
-    showToast('Sessions exported to CSV', 'success');
-  };
-
-  const importCSV = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (!user) {
-      showToast('You must be logged in to import data.', 'error');
-      return;
-    }
-
-    const file = event.target.files?.[0];
-    if (!file) {
-      showToast('No file selected', 'error');
-      return;
-    }
-
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: async (results) => {
-        const requiredHeaders = ['Date', 'Start', 'Stop', 'Project'];
-        const headers = results.meta.fields || [];
-        const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
-
-        if (missingHeaders.length > 0) {
-          showToast(`Missing required columns: ${missingHeaders.join(', ')}`, 'error');
-          return;
-        }
-
-        const importedSessions: any[] = results.data.map((row: any) => {
-          const date = row['Date'];
-          const startStr = row['Start'];
-          const stopStr = row['Stop'];
-
-          if (!date || !startStr || !stopStr) return null;
-
-          const start = new Date(`${date} ${startStr}`).getTime();
-          const stop = new Date(`${date} ${stopStr}`).getTime();
-          const durationMs = stop - start;
-
-          if (isNaN(start) || isNaN(stop) || durationMs < 0) return null;
-
-          return {
-            projectName: row['Project'],
-            start,
-            stop,
-            durationMs,
-            note: row['Note'] || '',
-          };
-        }).filter(Boolean);
-
-        if (importedSessions.length === 0) {
-          showToast('No valid sessions found in CSV', 'info');
-          return;
-        }
-
-        try {
-          const db = firestoreDB;
-          if (!db) {
-            throw new Error("Firestore is not initialized");
-          }
-
-          const projectsCol = collection(db, 'users', user.uid, 'projects');
-          const sessionsCol = collection(db, 'users', user.uid, 'sessions');
-
-          for (const session of importedSessions) {
-            const q = query(projectsCol, where("name", "==", session.projectName));
-            const querySnapshot = await getDocs(q);
-
-            let projectId: string;
-
-            if (querySnapshot.empty) {
-              const newProject = {
-                name: session.projectName,
-                color: `#${Math.floor(Math.random()*16777215).toString(16)}`,
-                archived: false,
-                createdAt: Date.now()
-              };
-              const docRef = await addDoc(projectsCol, newProject);
-              projectId = docRef.id;
-            } else {
-              projectId = querySnapshot.docs[0].id;
-            }
-
-            const newSession = {
-              projectId: projectId,
-              start: session.start,
-              stop: session.stop,
-              durationMs: session.durationMs,
-              note: session.note,
-              createdAt: Date.now()
-            };
-
-            await addDoc(sessionsCol, newSession);
-          }
-
-          showToast(`Successfully imported ${importedSessions.length} sessions to Firestore.`, 'success');
-        } catch(error) {
-          showToast('Failed to import sessions to Firestore', 'error');
-        }
-      },
-      error: (error) => {
-        showToast(`CSV parsing error: ${error.message}`, 'error');
-      }
-    });
-  };
-
   const getDynamicTitle = () => {
     switch (dateFilter) {
       case 'thisYear': return "This Year's Sessions";
@@ -425,10 +278,10 @@ export function HistoryPanel() {
       <div className="bg-white rounded-lg shadow-md p-6 no-print">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-semibold">History & Analytics</h2>
-          <span className="text-sm font-medium text-gray-500">Rev 1.3</span>
+          <span className="text-sm font-medium text-gray-500">Rev 1.4</span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+        <div className="grid grid-cols-2 gap-2 md:gap-4 mb-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Date Range
@@ -449,34 +302,6 @@ export function HistoryPanel() {
             </select>
           </div>
 
-          {dateFilter === 'custom' && (
-            <>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Start Date
-                </label>
-                <input
-                  type="date"
-                  value={customStart}
-                  onChange={(e) => setCustomStart(e.target.value)}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  End Date
-                </label>
-                <input
-                  type="date"
-                  value={customEnd}
-                  onChange={(e) => setCustomEnd(e.target.value)}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </>
-          )}
-
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Group By
@@ -490,9 +315,7 @@ export function HistoryPanel() {
               <option value="project">Project</option>
             </select>
           </div>
-        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Sort By
@@ -543,6 +366,34 @@ export function HistoryPanel() {
           </div>
         </div>
 
+        {dateFilter === 'custom' && (
+          <div className="grid grid-cols-2 gap-2 md:gap-4 mb-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Start Date
+              </label>
+              <input
+                type="date"
+                value={customStart}
+                onChange={(e) => setCustomStart(e.target.value)}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                End Date
+              </label>
+              <input
+                type="date"
+                value={customEnd}
+                onChange={(e) => setCustomEnd(e.target.value)}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+        )}
+
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Projects
@@ -583,58 +434,29 @@ export function HistoryPanel() {
 
         <div className="flex flex-wrap gap-3">
           <button
-            onClick={() => setShowChart(!showChart)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
-          >
-            {showChart ? 'Hide Chart' : 'Show Chart'}
-          </button>
-
-          <button
-            onClick={exportCSV}
-            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm"
-          >
-            Export CSV
-          </button>
-
-          <button
             onClick={() => setShowReport(true)}
             className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors text-sm"
           >
             Printable Report
           </button>
-
-          <label
-            className={`px-4 py-2 bg-purple-600 text-white rounded-md transition-colors text-sm ${
-              !user ? 'opacity-50 cursor-not-allowed' : 'hover:bg-purple-700 cursor-pointer'
-            }`}
-            title={!user ? "You must be logged in to import data" : "Import sessions from a CSV file"}
-          >
-            Import CSV
-            <input
-              type="file"
-              className="hidden"
-              accept=".csv"
-              onChange={importCSV}
-              disabled={!user}
-            />
-          </label>
         </div>
       </div>
 
       {/* Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 no-print">
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-lg font-semibold mb-2">Total Hours</h3>
-          <p className="text-3xl font-bold text-blue-600">
-            {summaryData.totalHours.toFixed(1)}
-          </p>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-lg font-semibold mb-2">Sessions Count</h3>
-          <p className="text-3xl font-bold text-green-600">
-            {summaryData.sessionsCount}
-          </p>
+      <div className="bg-white rounded-lg shadow-md p-6 no-print">
+        <div className="flex justify-between items-center">
+          <div>
+            <h3 className="text-lg font-semibold mb-2">Total Hours</h3>
+            <p className="text-3xl font-bold text-blue-600">
+              {summaryData.totalHours.toFixed(1)}
+            </p>
+          </div>
+          <div className="text-right">
+            <h3 className="text-lg font-semibold mb-2">Sessions</h3>
+            <p className="text-3xl font-bold text-green-600">
+              {summaryData.sessionsCount}
+            </p>
+          </div>
         </div>
       </div>
 
@@ -644,7 +466,7 @@ export function HistoryPanel() {
       </div>
 
       {/* Chart */}
-      {showChart && chartData.datasets[0].data.some(val => val > 0) && (
+      {chartData.datasets[0].data.some(val => val > 0) && (
         <div className="bg-white rounded-lg shadow-md p-6 no-print">
           <div className="chart-container">
             <Bar data={chartData} options={chartOptions} />

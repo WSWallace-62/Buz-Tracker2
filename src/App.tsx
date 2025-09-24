@@ -20,13 +20,11 @@ import './styles.css';
 
 // Lazy load all non-critical/route-specific components
 const HistoryPanel = lazy(() => import('./components/HistoryPanel').then(module => ({ default: module.HistoryPanel })));
-const UserProfile = lazy(() => import('./components/UserProfile').then(module => ({ default: module.UserProfile })));
+const SettingsPage = lazy(() => import('./components/SettingsPage').then(module => ({ default: module.SettingsPage })));
 const Auth = lazy(() => import('./components/Auth').then(module => ({ default: module.Auth })));
 const AddEntryModal = lazy(() => import('./components/AddEntryModal').then(module => ({ default: module.AddEntryModal })));
 const ProjectManagerModal = lazy(() => import('./components/ProjectManagerModal').then(module => ({ default: module.ProjectManagerModal })));
 const ConfirmDialog = lazy(() => import('./components/ConfirmDialog').then(module => ({ default: module.ConfirmDialog })));
-const NotificationSettings = lazy(() => import('./components/NotificationSettings'));
-
 
 type Tab = 'tracker' | 'history' | 'settings';
 
@@ -112,12 +110,9 @@ function AppContent() {
     }
   }, []);
 
-  // --- ADD THIS NEW useEffect BLOCK ---
-  // Unlocks audio on the first user interaction.
   useEffect(() => {
     const unlockAudio = () => {
       audioManager.unlock();
-      // These listeners only need to run once, so we remove them after the first interaction.
       window.removeEventListener('click', unlockAudio);
       window.removeEventListener('touchstart', unlockAudio);
       window.removeEventListener('keydown', unlockAudio);
@@ -127,14 +122,12 @@ function AppContent() {
     window.addEventListener('touchstart', unlockAudio);
     window.addEventListener('keydown', unlockAudio);
 
-    // Cleanup function to remove listeners if the component unmounts before interaction.
     return () => {
       window.removeEventListener('click', unlockAudio);
       window.removeEventListener('touchstart', unlockAudio);
       window.removeEventListener('keydown', unlockAudio);
     };
   }, []);
-  // --- END OF NEW BLOCK ---
 
   const handleLogin = () => {
     setIsGuest(true);
@@ -263,32 +256,7 @@ function AppContent() {
               </div>
             } />
             <Route path="/history" element={<HistoryPanel />} />
-            <Route path="/settings" element={
-              <div className="space-y-8">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                  <UserProfile />
-                  <div className="bg-white rounded-lg shadow-md p-6">
-                    <h3 className="text-lg font-semibold mb-4">Keyboard Shortcuts</h3>
-                    <div className="space-y-2 text-sm text-gray-600">
-                      <div><kbd className="bg-gray-100 px-2 py-1 rounded">Ctrl+N</kbd> Add Entry</div>
-                      <div><kbd className="bg-gray-100 px-2 py-1 rounded">Space</kbd> Start/Stop Timer (when stopwatch is focused)</div>
-                      <div><kbd className="bg-gray-100 px-2 py-1 rounded">Enter</kbd> Submit forms</div>
-                      <div><kbd className="bg-gray-100 px-2 py-1 rounded">Escape</kbd> Close modals</div>
-                    </div>
-                  </div>
-                </div>
-                <NotificationSettings />
-                <div className="bg-white rounded-lg shadow-md p-6">
-                  <h3 className="text-lg font-semibold mb-4">About BuzTracker</h3>
-                  <div className="text-gray-600 space-y-2">
-                    <p>BuzTracker is a local-first time tracking application that works offline.</p>
-                    <p>All your data is stored locally in your browser and never sent to any server.</p>
-                    <p>You can export your data at any time and import it on another device.</p>
-                    <div className="mt-4 text-xs text-gray-500">Version 1.0.0 • Built with React, TypeScript, and IndexedDB</div>
-                  </div>
-                </div>
-              </div>
-            } />
+            <Route path="/settings" element={<SettingsPage />} />
           </Routes>
         </Suspense>
       </main>
