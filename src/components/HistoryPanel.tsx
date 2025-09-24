@@ -43,7 +43,6 @@ export function HistoryPanel() {
   const [customEnd, setCustomEnd] = useState('');
   const [selectedProjectIds, setSelectedProjectIds] = useState<number[]>([]);
   const [groupBy, setGroupBy] = useState<GroupBy>('day');
-  const [showChart, setShowChart] = useState(true);
   const [sortOrder, setSortOrder] = useState<'date-desc' | 'date-asc' | 'start-desc' | 'start-asc'>('date-desc');
   const [noteFilter, setNoteFilter] = useState('');
   const [showReport, setShowReport] = useState(false);
@@ -435,13 +434,6 @@ export function HistoryPanel() {
 
         <div className="flex flex-wrap gap-3">
           <button
-            onClick={() => setShowChart(!showChart)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
-          >
-            {showChart ? 'Hide Chart' : 'Show Chart'}
-          </button>
-
-          <button
             onClick={() => setShowReport(true)}
             className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors text-sm"
           >
@@ -473,7 +465,7 @@ export function HistoryPanel() {
       </div>
 
       {/* Chart */}
-      {showChart && chartData.datasets[0].data.some(val => val > 0) && (
+      {chartData.datasets[0].data.some(val => val > 0) && (
         <div className="bg-white rounded-lg shadow-md p-6 no-print">
           <div className="chart-container">
             <Bar data={chartData} options={chartOptions} />
