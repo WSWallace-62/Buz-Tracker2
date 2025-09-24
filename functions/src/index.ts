@@ -46,7 +46,8 @@ export const checkLongRunningTimers = onSchedule(
         const userId = doc.ref.parent.parent?.id;
 
         if (!userId) {
-          logger.warn("Found a running session with no parent user ID:", doc.id);
+          logger.warn("Found a running session with no parent user ID:",
+            doc.id);
           continue;
         }
 
