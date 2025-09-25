@@ -126,7 +126,9 @@ describe('Dexie Database', () => {
         startTs: Date.now(),
         isPaused: false,
         pauseStartTime: null,
-        totalPausedTime: 0
+        totalPausedTime: 0,
+        baseDuration: 0,
+        continuedFromSessionId: null,
       })
 
       const runningSession = await db.runningSession.toCollection().first()
