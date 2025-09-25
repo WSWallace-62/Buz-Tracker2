@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react'
 import { useSessionsStore } from '../store/sessions'
 import { useProjectsStore } from '../store/projects'
 import { useUIStore } from '../store/ui'
-// --- Import the new parseDurationToMs function ---
 import { formatTime, formatDurationHHMM, isToday, formatDate, parseDurationToMs } from '../utils/time'
 import { Session } from '../db/dexie'
 
@@ -14,7 +13,7 @@ interface SessionsTableProps {
 }
 
 export function SessionsTable({ projectId, showAllProjects = false, sessions: externalSessions, title }: SessionsTableProps) {
-  const { sessions, getTodaySessions, deleteSession, loadSessions, continueSession, runningSession } = useSessionsStore()
+  const { getTodaySessions, deleteSession, loadSessions, continueSession, runningSession, sessions } = useSessionsStore()
   const { projects } = useProjectsStore()
   const { showConfirm, showToast } = useUIStore()
   const [editingSession, setEditingSession] = useState<Session | null>(null)
@@ -25,11 +24,15 @@ export function SessionsTable({ projectId, showAllProjects = false, sessions: ex
     }
   }, [loadSessions, externalSessions])
 
-  const displaySessions = externalSessions || (
-    showAllProjects 
-      ? sessions.filter(s => isToday(s.start))
-      : getTodaySessions(projectId)
-  )
+  const getProjectName = (projectId: number) => {
+    const project = projects.find(p => p.id === projectId)
+    return project?.name || 'Unknown Project'
+  }
+
+  const getProjectColor = (projectId: number) => {
+    const project = projects.find(p => p.id === projectId)
+    return project?.color || '#6b7280'
+  }
 
   const handleEdit = (session: Session) => {
     setEditingSession(session)
@@ -79,17 +82,18 @@ export function SessionsTable({ projectId, showAllProjects = false, sessions: ex
     )
   }
 
-  const getProjectName = (projectId: number) => {
-    const project = projects.find(p => p.id === projectId)
-    return project?.name || 'Unknown Project'
-  }
+  const displaySessions = externalSessions || (
+    showAllProjects 
+      ? sessions.filter(s => isToday(s.start))
+      : getTodaySessions(projectId)
+  )
 
-  const getProjectColor = (projectId: number) => {
-    const project = projects.find(p => p.id === projectId)
-    return project?.color || '#6b7280'
-  }
+  // Filter out the session that is currently being continued
+  const sessionsToList = displaySessions.filter(
+    s => s.id !== runningSession?.continuedFromSessionId
+  );
 
-  if (displaySessions.length === 0) {
+  if (sessionsToList.length === 0) {
     return (
       <div className="bg-white rounded-lg shadow-md p-6">
         <h3 className="text-lg font-semibold mb-4">
@@ -151,7 +155,7 @@ export function SessionsTable({ projectId, showAllProjects = false, sessions: ex
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {displaySessions.map((session) => (
+            {sessionsToList.map((session) => (
               <tr key={session.id} className="hover:bg-gray-50">
                 {showAllProjects && (
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">

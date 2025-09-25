@@ -334,10 +334,10 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
   updateSession: async (id, updates) => {
     try {
       const session = await db.sessions.get(id);
-      if (session) {
+      if (session && updates.durationMs === undefined) {
         const start = updates.start ?? session.start;
         const stop = updates.stop ?? session.stop;
-        if (stop && (updates.start !== undefined || updates.stop !== undefined || updates.durationMs === undefined)) {
+        if (stop) {
           updates.durationMs = stop - start;
         }
       }
@@ -406,13 +406,13 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
 
   startSession: async (projectId, note) => {
     try {
-      audioManager.play(); // Play silent audio immediately on user interaction
-
+      audioManager.play();
+  
       const existing = await db.runningSession.toCollection().first();
       if (existing) {
         throw new Error('A session is already running. Please stop it first.');
       }
-
+  
       const now = Date.now();
       const runningSession: RunningSession = {
         running: true,
@@ -422,38 +422,34 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
         isPaused: false,
         pauseStartTime: null,
         totalPausedTime: 0,
-        baseDuration: 0, // New field
-        originalStartTs: now, // New field
+        baseDuration: 0,
+        continuedFromSessionId: null,
       };
-
+  
       await db.runningSession.clear();
       const newId = await db.runningSession.add(runningSession);
       const newRunningSession = { ...runningSession, id: newId as number };
       set({ runningSession: newRunningSession });
       updateMediaSession('start', newRunningSession);
-
+  
+      // Firestore status update for new session
       const user = getAuth().currentUser;
       if (user && firestoreDb) {
-        try {
-          const projects = useProjectsStore.getState().projects;
-          const project = projects.find(p => p.id === projectId);
-
-          if (project?.firestoreId) {
-            const runningSessionDocRef = doc(firestoreDb, 'users', user.uid, 'status', 'runningSession');
-            await setDoc(runningSessionDocRef, {
-              projectId: project.firestoreId,
-              projectName: project.name,
-              startTs: newRunningSession.startTs,
-              note: newRunningSession.note || ''
-            });
-          }
-        } catch (fsError) {
-          console.error("Failed to sync running session status to Firestore:", fsError);
+        const projects = useProjectsStore.getState().projects;
+        const project = projects.find(p => p.id === projectId);
+        if (project?.firestoreId) {
+          const runningSessionDocRef = doc(firestoreDb, 'users', user.uid, 'status', 'runningSession');
+          await setDoc(runningSessionDocRef, {
+            projectId: project.firestoreId,
+            projectName: project.name,
+            startTs: newRunningSession.startTs,
+            note: newRunningSession.note || ''
+          });
         }
       }
     } catch (error) {
       set({ error: (error as Error).message });
-      audioManager.pause(); // Ensure audio is paused if start fails
+      audioManager.pause();
     }
   },
 
@@ -484,36 +480,44 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
       if (!running) {
         throw new Error('No running session found');
       }
-
+  
       const now = Date.now();
       let totalPaused = running.totalPausedTime;
       if (running.isPaused && running.pauseStartTime) {
         totalPaused += (now - running.pauseStartTime);
       }
-      const durationMs = running.baseDuration + (now - running.startTs) - totalPaused;
-
-      const newSessionData: Omit<Session, 'id' | 'createdAt' | 'firestoreId'> = {
-        projectId: running.projectId,
-        start: running.originalStartTs,
-        stop: now,
-        durationMs,
-        note: running.note,
-      };
-
-      await get().createSession(newSessionData);
+      const currentTimerDuration = (now - running.startTs) - totalPaused;
+      const finalDuration = running.baseDuration + currentTimerDuration;
+  
+      // If this was a continued session, update the original session
+      if (running.continuedFromSessionId) {
+        await get().updateSession(running.continuedFromSessionId, {
+          stop: now,
+          durationMs: finalDuration,
+          note: running.note, // Carry over the latest note
+          projectId: running.projectId
+        });
+      } else {
+        // Otherwise, create a new session
+        await get().createSession({
+          projectId: running.projectId,
+          start: running.startTs,
+          stop: now,
+          durationMs: finalDuration,
+          note: running.note,
+        });
+      }
+  
       await db.runningSession.clear();
       set({ runningSession: null });
       updateMediaSession('stop', null);
-      audioManager.pause(); // Pause silent audio
-
+      audioManager.pause();
+  
+      // Clear running status from Firestore
       const user = getAuth().currentUser;
       if (user && firestoreDb) {
-        try {
-          const runningSessionDocRef = doc(firestoreDb, 'users', user.uid, 'status', 'runningSession');
-          await deleteDoc(runningSessionDocRef);
-        } catch (fsError) {
-          console.error("Failed to delete running session status from Firestore:", fsError);
-        }
+        const runningSessionDocRef = doc(firestoreDb, 'users', user.uid, 'status', 'runningSession');
+        await deleteDoc(runningSessionDocRef);
       }
     } catch (error) {
       set({ error: (error as Error).message });
@@ -529,10 +533,6 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
         throw new Error('A session is already running. Please stop it first.');
       }
   
-      // First, delete the old session that is being continued
-      await db.sessions.delete(sessionToContinue.id!);
-      get().loadSessions();
-  
       const now = Date.now();
       const runningSession: RunningSession = {
         running: true,
@@ -542,8 +542,8 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
         isPaused: false,
         pauseStartTime: null,
         totalPausedTime: 0,
-        baseDuration: sessionToContinue.durationMs,       // Carry over the old duration
-        originalStartTs: sessionToContinue.start,       // Preserve the original start time
+        baseDuration: sessionToContinue.durationMs,
+        continuedFromSessionId: sessionToContinue.id!,
       };
   
       await db.runningSession.clear();
@@ -551,6 +551,7 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
       const newRunningSession = { ...runningSession, id: newId as number };
       set({ runningSession: newRunningSession });
       updateMediaSession('start', newRunningSession);
+      get().loadSessions(); // Re-load to make the session disappear from the list
       
     } catch (error) {
       set({ error: (error as Error).message });
