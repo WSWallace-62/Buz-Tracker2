@@ -42,6 +42,9 @@ export interface RunningSession {
   isPaused: boolean
   pauseStartTime: number | null
   totalPausedTime: number
+  // New fields for continue functionality
+  baseDuration: number
+  originalStartTs: number
 }
 
 export class BuzTrackerDB extends Dexie {

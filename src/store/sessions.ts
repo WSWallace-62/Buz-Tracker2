@@ -141,6 +141,7 @@ interface SessionsState {
   // --- New Actions for Pause/Resume ---
   pauseSession: () => Promise<void>;
   resumeSession: () => Promise<void>;
+  continueSession: (session: Session) => Promise<void>;
 
   // Queries
   getTodaySessions: (projectId?: number) => Session[];
@@ -421,6 +422,8 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
         isPaused: false,
         pauseStartTime: null,
         totalPausedTime: 0,
+        baseDuration: 0, // New field
+        originalStartTs: now, // New field
       };
 
       await db.runningSession.clear();
@@ -487,11 +490,11 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
       if (running.isPaused && running.pauseStartTime) {
         totalPaused += (now - running.pauseStartTime);
       }
-      const durationMs = (now - running.startTs) - totalPaused;
+      const durationMs = running.baseDuration + (now - running.startTs) - totalPaused;
 
       const newSessionData: Omit<Session, 'id' | 'createdAt' | 'firestoreId'> = {
         projectId: running.projectId,
-        start: running.startTs,
+        start: running.originalStartTs,
         stop: now,
         durationMs,
         note: running.note,
@@ -514,6 +517,44 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
       }
     } catch (error) {
       set({ error: (error as Error).message });
+    }
+  },
+
+  continueSession: async (sessionToContinue: Session) => {
+    try {
+      audioManager.play();
+  
+      const existing = await db.runningSession.toCollection().first();
+      if (existing) {
+        throw new Error('A session is already running. Please stop it first.');
+      }
+  
+      // First, delete the old session that is being continued
+      await db.sessions.delete(sessionToContinue.id!);
+      get().loadSessions();
+  
+      const now = Date.now();
+      const runningSession: RunningSession = {
+        running: true,
+        projectId: sessionToContinue.projectId,
+        startTs: now,
+        note: sessionToContinue.note,
+        isPaused: false,
+        pauseStartTime: null,
+        totalPausedTime: 0,
+        baseDuration: sessionToContinue.durationMs,       // Carry over the old duration
+        originalStartTs: sessionToContinue.start,       // Preserve the original start time
+      };
+  
+      await db.runningSession.clear();
+      const newId = await db.runningSession.add(runningSession);
+      const newRunningSession = { ...runningSession, id: newId as number };
+      set({ runningSession: newRunningSession });
+      updateMediaSession('start', newRunningSession);
+      
+    } catch (error) {
+      set({ error: (error as Error).message });
+      audioManager.pause();
     }
   },
 
@@ -561,13 +602,13 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
     const running = get().runningSession;
     if (!running) return 0;
     
-    const elapsed = (Date.now() - running.startTs) - running.totalPausedTime;
+    const elapsedSinceStart = (Date.now() - running.startTs) - running.totalPausedTime;
+    let currentPauseDuration = 0;
     if (running.isPaused && running.pauseStartTime) {
-      const currentPauseDuration = Date.now() - running.pauseStartTime;
-      return elapsed - currentPauseDuration;
+      currentPauseDuration = Date.now() - running.pauseStartTime;
     }
     
-    return elapsed;
+    return running.baseDuration + elapsedSinceStart - currentPauseDuration;
   },
 
   getTodaySessions: (projectId) => {
