@@ -10,8 +10,10 @@ const CsvImportExportCard = lazy(() => import('../components/CsvImportExportCard
 export function SettingsPage() {
   return (
     <div className="space-y-8">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 gap-8">
         <UserProfile />
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <CsvImportExportCard />
         <div className="bg-white rounded-lg shadow-md p-6">
           <h3 className="text-lg font-semibold mb-4">Keyboard Shortcuts</h3>
