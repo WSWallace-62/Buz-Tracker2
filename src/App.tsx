@@ -249,7 +249,7 @@ function AppContent() {
                 <div className="flex flex-wrap gap-4">
                   <button onClick={openAddEntryModal} className="btn-primary flex items-center" title="Add manual time entry (Ctrl+N)">
                     <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-                    Add Entry
+                    Add Session
                   </button>
                 </div>
                 <SessionsTable projectId={currentProjectId || undefined} />
