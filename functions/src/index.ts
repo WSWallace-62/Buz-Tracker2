@@ -69,7 +69,7 @@ export const checkLongRunningTimers = onSchedule(
         // 3. Check if the session has been running longer than the threshold.
         if (now - session.startTs > thresholdMillis) {
           logger.info(
-            `Session for user ${userId} on project "${session.projectName}" ` +
+            `Session for user ${userId} on project \"${session.projectName}\" ` +
             `has been running for over ${thresholdHours} hours.`
           );
 
@@ -89,7 +89,7 @@ export const checkLongRunningTimers = onSchedule(
           const messagePayload = {
             notification: {
               title: 'Timer Still Running?',
-              body: `Your timer for "${session.projectName}" has been ` +
+              body: `Your timer for \"${session.projectName}\" has been ` +
                 `active for over ${thresholdHours} hours.`
             },
             tokens: tokens,
