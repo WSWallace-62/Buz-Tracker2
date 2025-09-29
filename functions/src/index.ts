@@ -30,7 +30,7 @@ export const checkLongRunningTimers = onSchedule(
     const now = Date.now();
     // Query all `runningSession` documents across all users.
     // The collection is 'status', and the document ID is 'runningSession'.
-    const runningSessionsQuery = db.collectionGroup('status');
+    const runningSessionsQuery = db.collectionGroup("status");
 
     try {
       const querySnapshot = await runningSessionsQuery.get();
@@ -52,8 +52,8 @@ export const checkLongRunningTimers = onSchedule(
         }
 
         // 1. Get the user's notification settings from Firestore.
-        const settingsDoc = await db.collection('users').doc(userId)
-          .collection('config').doc('settings').get();
+        const settingsDoc = await db.collection("users").doc(userId)
+          .collection("config").doc("settings").get();
         const settings = settingsDoc.data();
 
         // 2. Check if the user has reminders enabled.
@@ -74,8 +74,8 @@ export const checkLongRunningTimers = onSchedule(
           );
 
           // 4. Get the user's FCM registration tokens.
-          const tokensSnapshot = await db.collection('users').doc(userId)
-            .collection('fcmTokens').get();
+          const tokensSnapshot = await db.collection("users").doc(userId)
+            .collection("fcmTokens").get();
           if (tokensSnapshot.empty) {
             logger.warn(
               `User ${userId} has a long-running timer but no FCM tokens.`
@@ -83,14 +83,14 @@ export const checkLongRunningTimers = onSchedule(
             continue;
           }
 
-          const tokens = tokensSnapshot.docs.map(tokenDoc => tokenDoc.id);
+          const tokens = tokensSnapshot.docs.map((tokenDoc) => tokenDoc.id);
 
           // 5. Construct and send the push notification.
           const messagePayload = {
             notification: {
-              title: 'Timer Still Running?',
+              title: "Timer Still Running?",
               body: `Your timer for "${session.projectName}" has been ` +
-                `active for over ${thresholdHours} hours.`
+                `active for over ${thresholdHours} hours.`,
             },
             tokens: tokens,
           };

@@ -41,8 +41,7 @@ function AppContent() {
   const { reconcileProjects, startProjectSync, stopProjectSync } = useProjectsStore();
   const { getTodaySessions, startSync, stopSync } = useSessionsStore();
   const { currentProjectId, setCurrentProject, openAddEntryModal } = useUIStore();
-  const { user, setUser } = useAuthStore();
-  const [isLoading, setIsLoading] = useState(true);
+  const { user, setUserAndOrg, isLoading: isAuthLoading } = useAuthStore();
   const [isGuest, setIsGuest] = useState(false);
   const location = useLocation();
 
@@ -51,8 +50,7 @@ function AppContent() {
   const { runningSession, getCurrentElapsed, loadSessions, loadRunningSession } = useSessionsStore();
 
   const initializeApp = useCallback(async (currentUser: User | null) => {
-    setUser(currentUser);
-    setIsLoading(true);
+    await setUserAndOrg(currentUser);
 
     if (currentUser) {
       setIsGuest(false);
@@ -70,11 +68,10 @@ function AppContent() {
         setCurrentProject(settings.lastProjectId);
       }
     }
-
-    setIsLoading(false);
-  }, [isGuest, setUser, reconcileProjects, loadSessions, loadRunningSession, startSync, setCurrentProject, startProjectSync]);
+  }, [isGuest, setUserAndOrg, reconcileProjects, loadSessions, loadRunningSession, startSync, setCurrentProject, startProjectSync]);
 
   useEffect(() => {
+    // onAuthStateChanged returns an unsubscribe function that we can use for cleanup.
     const unsubscribe = onAuthStateChanged(auth, initializeApp);
     
     return () => {
@@ -143,7 +140,6 @@ function AppContent() {
     useProjectsStore.setState({ projects: [], isLoading: false, error: null });
     useSessionsStore.setState({ sessions: [], runningSession: null, isLoading: true, error: null });
     useUIStore.setState({ currentProjectId: null });
-    setUser(null);
     setIsGuest(false);
     await db.on.ready.fire(db);
   };
@@ -157,7 +153,7 @@ function AppContent() {
     </div>
   );
 
-  if (isLoading) {
+  if (isAuthLoading) {
     return loadingSpinner;
   }
 
