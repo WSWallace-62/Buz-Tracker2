@@ -54,17 +54,21 @@ export class BuzTrackerDB extends Dexie {
   constructor() {
     super('BuzTrackerDB')
     
-    // --- Bumped DB version from 5 to 6 ---
-    this.version(6).stores({
+    // FIX: Bump DB version to be higher than existing (610)
+    this.version(611).stores({
       projects: '++id, firestoreId, name, createdAt, archived',
       sessions: '++id, projectId, firestoreId, start, stop, createdAt, *note',
       settings: '++id',
       runningSession: '++id, running, projectId, startTs, isPaused, continuedFromSessionId' 
     })
 
-    this.on('ready', async () => {
+    this.on('ready', () => this.initializeDatabase());
+  }
+
+  async initializeDatabase() {
+    await this.transaction('rw', this.projects, this.settings, async () => {
       // Initialize default settings
-      const settingsCount = await this.settings.count()
+      const settingsCount = await this.settings.count();
       if (settingsCount === 0) {
         await this.settings.add({
           theme: 'light',
@@ -72,26 +76,26 @@ export class BuzTrackerDB extends Dexie {
           showLiveTimer: true,
           enableSmartReminders: false,
           reminderThresholdHours: 4
-        })
+        });
       }
 
       // Initialize default project
-      const projectsCount = await this.projects.count()
+      const projectsCount = await this.projects.count();
       if (projectsCount === 0) {
         await this.projects.add({
           name: 'Default Project',
           color: '#3b82f6',
           createdAt: Date.now(),
           archived: false
-        })
+        });
       }
-    })
+    });
+    console.log("Database initialized with default data.");
   }
 }
 
 export const db = new BuzTrackerDB()
 
-// --- Add this new function at the end of the file ---
 export async function clearDatabase() {
   await db.transaction('rw', db.projects, db.sessions, db.settings, db.runningSession, async () => {
     await Promise.all([
@@ -102,4 +106,9 @@ export async function clearDatabase() {
     ]);
   });
   console.log('Local database cleared.');
+}
+
+// FIX: Export a standalone function to be called from App.tsx
+export async function initializeDatabase() {
+  await db.initializeDatabase();
 }
