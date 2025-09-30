@@ -295,9 +295,6 @@ export function Stopwatch({ projectId }: StopwatchProps) {
           </p>
         )}
 
-        <p className="mt-2 text-xs text-gray-500 hidden sm:block">
-          Press Space to {canEnd ? 'end' : 'start'}
-        </p>
       </div>
     </div>
   );

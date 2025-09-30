@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { db, Session, RunningSession } from '../db/dexie';
 import { getAuth } from 'firebase/auth';
 import { useProjectsStore } from './projects';
+import { useUIStore } from './ui';
 import { useNotificationSettingsStore } from './notificationSettings';
 import {
   addDoc,
@@ -523,16 +524,15 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
       set({ error: (error as Error).message });
     }
   },
-
   continueSession: async (sessionToContinue: Session) => {
     try {
       audioManager.play();
-  
+
       const existing = await db.runningSession.toCollection().first();
       if (existing) {
         throw new Error('A session is already running. Please stop it first.');
       }
-  
+
       const now = Date.now();
       const runningSession: RunningSession = {
         running: true,
@@ -545,14 +545,18 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
         baseDuration: sessionToContinue.durationMs,
         continuedFromSessionId: sessionToContinue.id!,
       };
-  
+
       await db.runningSession.clear();
       const newId = await db.runningSession.add(runningSession);
       const newRunningSession = { ...runningSession, id: newId as number };
       set({ runningSession: newRunningSession });
       updateMediaSession('start', newRunningSession);
       get().loadSessions(); // Re-load to make the session disappear from the list
-      
+
+      // Automatically switch to the active project on the Time Tracker page
+      const { setCurrentProject } = useUIStore.getState();
+      setCurrentProject(sessionToContinue.projectId);
+
     } catch (error) {
       set({ error: (error as Error).message });
       audioManager.pause();

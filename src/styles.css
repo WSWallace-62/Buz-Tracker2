@@ -151,3 +151,18 @@
     display: none !important;
   }
 }
+
+/* Fix mobile horizontal scrolling issue for both iOS and Android */
+.custom-scrollbar {
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x pan-y;
+  /* Additional Android-specific optimizations */
+  overscroll-behavior-x: contain;
+}
+
+/* Ensure all overflow-x-auto containers work properly on mobile */
+.overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x pan-y;
+  overscroll-behavior-x: contain;
+}
