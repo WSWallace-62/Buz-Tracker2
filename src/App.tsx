@@ -14,6 +14,7 @@ import { Stopwatch } from './components/Stopwatch';
 import { SessionsTable } from './components/SessionsTable';
 import { Toast } from './components/Toast';
 import { InstallButton } from './pwa/InstallButton';
+import { UserMenu } from './components/UserMenu';
 import { getTotalDuration, formatDurationHHMM, formatDuration } from './utils/time';
 import { audioManager } from './utils/audioManager';
 import './styles.css';
@@ -21,6 +22,7 @@ import './styles.css';
 // Lazy load all non-critical/route-specific components
 const HistoryPanel = lazy(() => import('./components/HistoryPanel').then(module => ({ default: module.HistoryPanel })));
 const SettingsPage = lazy(() => import('./pages/SettingsPage').then(module => ({ default: module.SettingsPage })));
+const ProfilePage = lazy(() => import('./pages/ProfilePage').then(module => ({ default: module.ProfilePage })));
 const Auth = lazy(() => import('./components/Auth').then(module => ({ default: module.Auth })));
 const AddEntryModal = lazy(() => import('./components/AddEntryModal').then(module => ({ default: module.AddEntryModal })));
 const ProjectManagerModal = lazy(() => import('./components/ProjectManagerModal').then(module => ({ default: module.ProjectManagerModal })));
@@ -172,7 +174,7 @@ function AppContent() {
     <div className="min-h-screen bg-gray-50">
       <a href="#main-content" className="skip-link">Skip to main content</a>
       
-      <header className="bg-white shadow-sm border-b border-gray-200">
+      <header className="sticky top-0 z-50 bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
@@ -194,25 +196,19 @@ function AppContent() {
             <div className="flex items-center space-x-4">
               <InstallButton />
               {(user || isGuest) && (
-                <button
-                  onClick={handleLogout}
-                  className="px-3 py-1.5 text-sm font-medium text-gray-800 bg-gray-300 rounded-md hover:bg-gray-400"
-                >
-                  Logout
-                </button>
+                <UserMenu onLogout={handleLogout} isGuest={isGuest} />
               )}
             </div>
           </div>
         </div>
       </header>
 
-      <nav className="bg-white border-b border-gray-200" role="navigation" aria-label="Main navigation">
+      <nav className="sticky top-16 z-40 bg-white border-b border-gray-200" role="navigation" aria-label="Main navigation">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex space-x-8">
             {[
               { id: 'tracker', label: 'Time Tracker', path: '/' },
-              { id: 'history', label: 'History', path: '/history' },
-              { id: 'settings', label: 'Settings', path: '/settings' }
+              { id: 'history', label: 'History', path: '/history' }
             ].map((tab) => (
               <Link
                 key={tab.id}
@@ -252,6 +248,7 @@ function AppContent() {
               </div>
             } />
             <Route path="/history" element={<HistoryPanel />} />
+            <Route path="/profile" element={<ProfilePage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Routes>
         </Suspense>

@@ -1,17 +1,16 @@
-
-// src/pages/SettingsPage.tsx
+ // src/pages/SettingsPage.tsx
 
 import { lazy } from 'react';
 
-const UserProfile = lazy(() => import('../components/UserProfile').then(module => ({ default: module.UserProfile })));
 const NotificationSettings = lazy(() => import('../components/NotificationSettings'));
 const CsvImportExportCard = lazy(() => import('../components/CsvImportExportCard').then(module => ({ default: module.CsvImportExportCard })));
 
 export function SettingsPage() {
   return (
     <div className="space-y-8">
-      <div className="grid grid-cols-1 gap-8">
-        <UserProfile />
+      <h2 className="text-2xl font-bold text-gray-900">Settings</h2>
+      <div className="bg-white rounded-lg shadow-md p-6" style={{ minHeight: '10vh' }}>
+        {/* Settings content will be added here */}
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <CsvImportExportCard />
@@ -32,7 +31,7 @@ export function SettingsPage() {
           <p>BuzTracker is a local-first time tracking application that works offline.</p>
           <p>All your data is stored locally in your browser and never sent to any server.</p>
           <p>You can export your data at any time and import it on another device.</p>
-          <div className="mt-4 text-xs text-gray-500">Version 1.0.0 • Built with React, TypeScript, and IndexedDB</div>
+          <div className="mt-4 text-xs text-gray-500">Version 1.7 • Built with React, TypeScript, and IndexedDB</div>
         </div>
       </div>
     </div>
