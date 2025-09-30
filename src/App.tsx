@@ -14,6 +14,7 @@ import { Stopwatch } from './components/Stopwatch';
 import { SessionsTable } from './components/SessionsTable';
 import { Toast } from './components/Toast';
 import { InstallButton } from './pwa/InstallButton';
+import { UserMenu } from './components/UserMenu';
 import { getTotalDuration, formatDurationHHMM, formatDuration } from './utils/time';
 import { audioManager } from './utils/audioManager';
 import './styles.css';
@@ -194,12 +195,7 @@ function AppContent() {
             <div className="flex items-center space-x-4">
               <InstallButton />
               {(user || isGuest) && (
-                <button
-                  onClick={handleLogout}
-                  className="px-3 py-1.5 text-sm font-medium text-gray-800 bg-gray-300 rounded-md hover:bg-gray-400"
-                >
-                  Logout
-                </button>
+                <UserMenu onLogout={handleLogout} isGuest={isGuest} />
               )}
             </div>
           </div>
