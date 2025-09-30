@@ -91,31 +91,29 @@ export function UserMenu({ onLogout, isGuest }: UserMenuProps) {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+        <div className="absolute right-0 mt-2 w-72 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
           {/* User info section */}
           <div className="px-4 py-3 border-b border-gray-200">
-            <p className="text-sm font-medium text-gray-900">{getUserDisplayName()}</p>
-            {user?.email && (
-              <p className="text-xs text-gray-500 truncate">{user.email}</p>
+            <p className="text-sm font-medium text-gray-900">
+              {getUserDisplayName()}
+            </p>
+            {!isGuest && user?.email && user?.displayName && (
+              <p className="text-xs text-gray-500 break-all">{user.email}</p>
             )}
           </div>
 
           {/* Menu items */}
           <div className="py-1">
-            <button
-              onClick={() => {
-                setIsOpen(false);
-                // Profile action - not active yet
-              }}
-              className="w-full text-left px-4 py-2 text-sm text-gray-400 cursor-not-allowed flex items-center"
-              disabled
+            <Link
+              to="/profile"
+              onClick={() => setIsOpen(false)}
+              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
             >
               <svg className="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
               </svg>
               Profile
-              <span className="ml-auto text-xs">(Soon)</span>
-            </button>
+            </Link>
 
             <Link
               to="/settings"

@@ -22,6 +22,7 @@ import './styles.css';
 // Lazy load all non-critical/route-specific components
 const HistoryPanel = lazy(() => import('./components/HistoryPanel').then(module => ({ default: module.HistoryPanel })));
 const SettingsPage = lazy(() => import('./pages/SettingsPage').then(module => ({ default: module.SettingsPage })));
+const ProfilePage = lazy(() => import('./pages/ProfilePage').then(module => ({ default: module.ProfilePage })));
 const Auth = lazy(() => import('./components/Auth').then(module => ({ default: module.Auth })));
 const AddEntryModal = lazy(() => import('./components/AddEntryModal').then(module => ({ default: module.AddEntryModal })));
 const ProjectManagerModal = lazy(() => import('./components/ProjectManagerModal').then(module => ({ default: module.ProjectManagerModal })));
@@ -207,8 +208,7 @@ function AppContent() {
           <div className="flex space-x-8">
             {[
               { id: 'tracker', label: 'Time Tracker', path: '/' },
-              { id: 'history', label: 'History', path: '/history' },
-              { id: 'settings', label: 'Settings', path: '/settings' }
+              { id: 'history', label: 'History', path: '/history' }
             ].map((tab) => (
               <Link
                 key={tab.id}
@@ -248,6 +248,7 @@ function AppContent() {
               </div>
             } />
             <Route path="/history" element={<HistoryPanel />} />
+            <Route path="/profile" element={<ProfilePage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Routes>
         </Suspense>
