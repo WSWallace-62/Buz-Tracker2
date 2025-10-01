@@ -90,7 +90,7 @@ function AppContent() {
         setCurrentProject(settings.lastProjectId);
       }
     }
-  }, [isGuest, setUserAndOrg, reconcileProjects, loadSessions, loadRunningSession, startSync, setCurrentProject, startProjectSync, setTheme]);
+  }, [isGuest, setUserAndOrg, reconcileProjects, loadSessions, loadRunningSession, startSync, setCurrentProject, startProjectSync]);
 
   useEffect(() => {
     // onAuthStateChanged returns an unsubscribe function that we can use for cleanup.
