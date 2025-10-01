@@ -202,6 +202,9 @@ export function HistoryPanel() {
       : 0;
 
     const isMobile = windowWidth < 768;
+    const isDark = document.documentElement.classList.contains('dark');
+    const textColor = isDark ? '#e5e7eb' : '#374151';
+    const gridColor = isDark ? '#374151' : '#e5e7eb';
 
     return {
       responsive: true,
@@ -209,18 +212,37 @@ export function HistoryPanel() {
       plugins: {
         legend: {
           position: 'top' as const,
+          labels: {
+            color: textColor
+          }
         },
         title: {
           display: true,
-          text: groupBy === 'project' ? 'Hours by Project' : 'Hours per Day'
+          text: groupBy === 'project' ? 'Hours by Project' : 'Hours per Day',
+          color: textColor
         },
       },
       scales: {
+        x: {
+          ticks: {
+            color: textColor
+          },
+          grid: {
+            color: gridColor
+          }
+        },
         y: {
           beginAtZero: true,
           title: {
             display: true,
-            text: 'Hours'
+            text: 'Hours',
+            color: textColor
+          },
+          ticks: {
+            color: textColor
+          },
+          grid: {
+            color: gridColor
           },
           max: !isMobile && maxDataValue <= 5 ? 5 : undefined
         }
@@ -275,21 +297,21 @@ export function HistoryPanel() {
   return (
     <div className="space-y-6">
       {/* Filters */}
-      <div className="bg-white rounded-lg shadow-md p-6 no-print">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 no-print">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold">History & Analytics</h2>
-          <span className="text-sm font-medium text-gray-500">Rev 1.7</span>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">History & Analytics</h2>
+          <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Rev 2.0</span>
         </div>
 
         <div className="grid grid-cols-2 gap-2 md:gap-4 mb-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Date Range
             </label>
             <select
               value={dateFilter}
               onChange={(e) => setDateFilter(e.target.value as DateFilter)}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="thisYear">This Year</option>
               <option value="lastYear">Last Year</option>
@@ -303,13 +325,13 @@ export function HistoryPanel() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Group By
             </label>
             <select
               value={groupBy}
               onChange={(e) => setGroupBy(e.target.value as GroupBy)}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="day">Day</option>
               <option value="project">Project</option>
@@ -317,13 +339,13 @@ export function HistoryPanel() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Sort By
             </label>
             <select
               value={sortOrder}
               onChange={(e) => setSortOrder(e.target.value as any)}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="date-desc">Date (Newest First)</option>
               <option value="date-asc">Date (Oldest First)</option>
@@ -332,7 +354,7 @@ export function HistoryPanel() {
             </select>
           </div>
           <div className="relative">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Filter by Note
             </label>
             <input
@@ -340,12 +362,12 @@ export function HistoryPanel() {
               value={noteFilter}
               onChange={(e) => setNoteFilter(e.target.value)}
               placeholder="Enter note text..."
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             {noteFilter && (
               <button
                 onClick={() => setNoteFilter('')}
-                className="absolute inset-y-0 right-0 top-6 flex items-center pr-3 text-gray-400 hover:text-gray-600"
+                className="absolute inset-y-0 right-0 top-6 flex items-center pr-3 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
                 aria-label="Clear filter"
               >
                 <svg
@@ -369,33 +391,33 @@ export function HistoryPanel() {
         {dateFilter === 'custom' && (
           <div className="grid grid-cols-2 gap-2 md:gap-4 mb-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Start Date
               </label>
               <input
                 type="date"
                 value={customStart}
                 onChange={(e) => setCustomStart(e.target.value)}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 End Date
               </label>
               <input
                 type="date"
                 value={customEnd}
                 onChange={(e) => setCustomEnd(e.target.value)}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
           </div>
         )}
 
         <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             Projects
           </label>
           <div className="flex flex-wrap gap-2 mb-2">
@@ -404,7 +426,7 @@ export function HistoryPanel() {
               className={`px-3 py-1 rounded-full text-sm transition-colors ${
                 selectedProjectIds.length === 0
                   ? 'bg-blue-600 text-white'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
               }`}
             >
               All Projects
@@ -416,7 +438,7 @@ export function HistoryPanel() {
                 className={`px-3 py-1 rounded-full text-sm transition-colors flex items-center ${
                   selectedProjectIds.includes(project.id!)
                     ? 'text-white'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
                 }`}
                 style={{
                   backgroundColor: selectedProjectIds.includes(project.id!) ? project.color : undefined
@@ -443,17 +465,17 @@ export function HistoryPanel() {
       </div>
 
       {/* Summary */}
-      <div className="bg-white rounded-lg shadow-md p-6 no-print">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 no-print">
         <div className="flex justify-between items-center">
           <div>
-            <h3 className="text-lg font-semibold mb-2">Total Hours</h3>
-            <p className="text-3xl font-bold text-blue-600">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Total Hours</h3>
+            <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">
               {summaryData.totalHours.toFixed(1)}
             </p>
           </div>
           <div className="text-right">
-            <h3 className="text-lg font-semibold mb-2">Sessions</h3>
-            <p className="text-3xl font-bold text-green-600">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Sessions</h3>
+            <p className="text-3xl font-bold text-green-600 dark:text-green-400">
               {summaryData.sessionsCount}
             </p>
           </div>
@@ -467,7 +489,7 @@ export function HistoryPanel() {
 
       {/* Chart */}
       {chartData.datasets[0].data.some(val => val > 0) && (
-        <div className="bg-white rounded-lg shadow-md p-6 no-print">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 no-print">
           <div className="chart-container">
             <Bar data={chartData} options={chartOptions} />
           </div>

@@ -12,6 +12,7 @@ A local-first Progressive Web App (PWA) for tracking time and managing projects.
 - 💾 **Local Storage** - All data stored locally using IndexedDB
 - 📤 **Import/Export** - Backup and restore your data
 - ⌨️ **Keyboard Shortcuts** - Efficient navigation and control
+- 🌓 **Dark Mode** - Toggle between light and dark themes with persistent preference
 - ♿ **Accessibility** - Screen reader friendly with proper ARIA labels
 
 ## Technology Stack
@@ -130,6 +131,7 @@ src/
 - `SessionsTable` - Display and manage time sessions
 - `HistoryPanel` - Analytics and filtering
 - `ProjectManagerModal` - Project CRUD operations
+- `ThemeSelector` - Light/dark mode toggle component
 
 ### Data Models
 
@@ -174,3 +176,21 @@ MIT License - see LICENSE file for details
 - Edge 80+
 
 IndexedDB and PWA features require modern browsers.
+
+## Changelog
+
+### Version 2.0 (Current)
+- ✨ **Dark Mode Support** - Added comprehensive dark mode with theme toggle in Settings
+  - Light and dark theme options with persistent preference
+  - All components styled for both themes
+  - Chart.js integration with dynamic theme-aware colors
+  - Smooth transitions between themes
+- 🎨 **UI Enhancements** - Improved visual consistency across all components
+- 📊 **Chart Improvements** - Better color contrast and readability in both themes
+
+### Version 1.7
+- Initial release with core time tracking features
+- Project management and session tracking
+- Analytics and reporting
+- PWA support with offline functionality
+- Import/Export capabilities

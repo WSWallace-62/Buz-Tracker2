@@ -37,7 +37,7 @@ export function ProjectSelect({ onProjectChange, disabled = false }: ProjectSele
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (disabled) return
-    
+
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault()
       setIsOpen(!isOpen)
@@ -54,10 +54,10 @@ export function ProjectSelect({ onProjectChange, disabled = false }: ProjectSele
         onClick={() => !disabled && setIsOpen(!isOpen)}
         onKeyDown={handleKeyDown}
         className={`
-          w-full flex items-center justify-between px-3 py-2 border border-gray-300 
-          rounded-md shadow-sm bg-white text-left focus:outline-none focus:ring-2 
+          w-full flex items-center justify-between px-3 py-2 border border-gray-300 dark:border-gray-600
+          rounded-md shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-left focus:outline-none focus:ring-2
           focus:ring-blue-500 focus:border-blue-500
-          ${disabled ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : 'hover:bg-gray-50'}
+          ${disabled ? 'bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-500 cursor-not-allowed' : 'hover:bg-gray-50 dark:hover:bg-gray-600'}
         `}
         aria-label="Select project"
         aria-expanded={isOpen}
@@ -85,7 +85,7 @@ export function ProjectSelect({ onProjectChange, disabled = false }: ProjectSele
       </button>
 
       {isOpen && (
-        <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg">
+        <div className="absolute z-10 mt-1 w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg">
           <ul className="py-1 max-h-60 overflow-auto" role="listbox">
             {activeProjects.map((project) => (
               <li key={project.id} role="option" aria-selected={project.id === currentProjectId}>
@@ -93,8 +93,8 @@ export function ProjectSelect({ onProjectChange, disabled = false }: ProjectSele
                   type="button"
                   onClick={() => handleProjectSelect(project.id!)}
                   className={`
-                    w-full text-left px-3 py-2 flex items-center hover:bg-gray-50
-                    ${project.id === currentProjectId ? 'bg-blue-50 text-blue-900' : 'text-gray-900'}
+                    w-full text-left px-3 py-2 flex items-center hover:bg-gray-50 dark:hover:bg-gray-600
+                    ${project.id === currentProjectId ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-900 dark:text-blue-300' : 'text-gray-900 dark:text-gray-100'}
                   `}
                 >
                   <div
@@ -105,15 +105,15 @@ export function ProjectSelect({ onProjectChange, disabled = false }: ProjectSele
                 </button>
               </li>
             ))}
-            
-            <li className="border-t border-gray-100">
+
+            <li className="border-t border-gray-100 dark:border-gray-600">
               <button
                 type="button"
                 onClick={() => {
                   setIsOpen(false)
                   openProjectManager()
                 }}
-                className="w-full text-left px-3 py-2 flex items-center hover:bg-gray-50 text-blue-600"
+                className="w-full text-left px-3 py-2 flex items-center hover:bg-gray-50 dark:hover:bg-gray-600 text-blue-600 dark:text-blue-300"
               >
                 <svg
                   className="w-4 h-4 mr-2"

@@ -28,6 +28,7 @@ BuzTracker is a time tracking and project management Progressive Web App (PWA) b
 - `SessionsTable` - Time sessions display and editing
 - `HistoryPanel` - Analytics with filtering and charts
 - `ImportExport` - Data backup and restore
+- `ThemeSelector` - Light/dark mode toggle with persistent preference
 
 ### Data Models
 
@@ -46,7 +47,7 @@ BuzTracker is a time tracking and project management Progressive Web App (PWA) b
 ## Key Features Implementation
 
 - **Timer Persistence**: Running sessions survive browser refresh/close
-- **Offline First**: All data stored in IndexedDB, no server required  
+- **Offline First**: All data stored in IndexedDB, no server required
 - **PWA Install**: Service worker caches app for offline use
 - **Keyboard Shortcuts**: Ctrl+1/2/3 for tabs, Space for timer, Ctrl+N for add entry
 - **Import/Export**: JSON backup system for data portability

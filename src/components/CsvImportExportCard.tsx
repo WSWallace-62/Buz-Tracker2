@@ -1,4 +1,4 @@
-// src/components/CsvImportExportCard.tsx
+ // src/components/CsvImportExportCard.tsx
 import React from 'react';
 import { db as dexieDB } from '../db/dexie';
 import { useProjectsStore } from '../store/projects';
@@ -53,19 +53,19 @@ export function CsvImportExportCard() {
 
         showToast('All sessions exported to CSV', 'success');
     };
-    
+
     const importCSV = async (event: React.ChangeEvent<HTMLInputElement>) => {
         if (!user) {
           showToast('You must be logged in to import data.', 'error');
           return;
         }
-    
+
         const file = event.target.files?.[0];
         if (!file) {
           showToast('No file selected', 'error');
           return;
         }
-    
+
         Papa.parse(file, {
           header: true,
           skipEmptyLines: true,
@@ -73,25 +73,25 @@ export function CsvImportExportCard() {
             const requiredHeaders = ['Date', 'Start', 'Stop', 'Project'];
             const headers = results.meta.fields || [];
             const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
-    
+
             if (missingHeaders.length > 0) {
               showToast(`Missing required columns: ${missingHeaders.join(', ')}`, 'error');
               return;
             }
-    
+
             const importedSessions: any[] = results.data.map((row: any) => {
               const date = row['Date'];
               const startStr = row['Start'];
               const stopStr = row['Stop'];
-    
+
               if (!date || !startStr || !stopStr) return null;
-    
+
               const start = new Date(`${date} ${startStr}`).getTime();
               const stop = new Date(`${date} ${stopStr}`).getTime();
               const durationMs = stop - start;
-    
+
               if (isNaN(start) || isNaN(stop) || durationMs < 0) return null;
-    
+
               return {
                 projectName: row['Project'],
                 start,
@@ -100,27 +100,27 @@ export function CsvImportExportCard() {
                 note: row['Note'] || '',
               };
             }).filter(Boolean);
-    
+
             if (importedSessions.length === 0) {
               showToast('No valid sessions found in CSV', 'info');
               return;
             }
-    
+
             try {
               const db = firestoreDB;
               if (!db) {
                 throw new Error("Firestore is not initialized");
               }
-    
+
               const projectsCol = collection(db, 'users', user.uid, 'projects');
               const sessionsCol = collection(db, 'users', user.uid, 'sessions');
-    
+
               for (const session of importedSessions) {
                 const q = query(projectsCol, where("name", "==", session.projectName));
                 const querySnapshot = await getDocs(q);
-    
+
                 let projectId: string;
-    
+
                 if (querySnapshot.empty) {
                   const newProject = {
                     name: session.projectName,
@@ -133,7 +133,7 @@ export function CsvImportExportCard() {
                 } else {
                   projectId = querySnapshot.docs[0].id;
                 }
-    
+
                 const newSession = {
                   projectId: projectId,
                   start: session.start,
@@ -142,10 +142,10 @@ export function CsvImportExportCard() {
                   note: session.note,
                   createdAt: Date.now()
                 };
-    
+
                 await addDoc(sessionsCol, newSession);
               }
-    
+
               showToast(`Successfully imported ${importedSessions.length} sessions to Firestore.`, 'success');
             } catch(error) {
               console.error("Import error:", error);
@@ -159,9 +159,9 @@ export function CsvImportExportCard() {
       };
 
     return (
-        <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-semibold mb-4">Import & Export</h2>
-            <p className="text-sm text-gray-600 mb-4">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Import & Export</h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
                 Export all your session data to a CSV file, or import sessions from a previously exported file.
             </p>
             <div className="flex flex-wrap gap-3">

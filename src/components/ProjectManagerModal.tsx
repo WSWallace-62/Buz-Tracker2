@@ -112,20 +112,20 @@ export function ProjectManagerModal() {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div 
-        className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+      <div
+        className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
         onKeyDown={handleKeyDown}
         role="dialog"
         aria-modal="true"
         aria-labelledby="project-manager-title"
       >
         <div className="flex justify-between items-center mb-6">
-          <h2 id="project-manager-title" className="text-xl font-semibold">
+          <h2 id="project-manager-title" className="text-xl font-semibold text-gray-900 dark:text-white">
             Manage Projects
           </h2>
           <button
             onClick={closeProjectManager}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
             aria-label="Close"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -135,21 +135,21 @@ export function ProjectManagerModal() {
         </div>
 
         {(isCreating || editingProject) && (
-          <form onSubmit={handleSubmit} className="mb-6 p-4 bg-gray-50 rounded-lg">
-            <h3 className="font-medium mb-4">
+          <form onSubmit={handleSubmit} className="mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+            <h3 className="font-medium text-gray-900 dark:text-white mb-4">
               {editingProject ? 'Edit Project' : 'Create New Project'}
             </h3>
-            
+
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Project Name
                 </label>
                 <input
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Enter project name..."
                   autoFocus
                   required
@@ -157,7 +157,7 @@ export function ProjectManagerModal() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Color
                 </label>
                 <div className="flex flex-wrap gap-2">
@@ -168,7 +168,7 @@ export function ProjectManagerModal() {
                       onClick={() => setFormData({ ...formData, color })}
                       className={`
                         w-8 h-8 rounded-full border-2 transition-all
-                        ${formData.color === color ? 'border-gray-400 scale-110' : 'border-gray-200'}
+                        ${formData.color === color ? 'border-gray-400 dark:border-gray-500 scale-110' : 'border-gray-200 dark:border-gray-600'}
                       `}
                       style={{ backgroundColor: color }}
                       aria-label={`Select color ${color}`}
@@ -181,7 +181,7 @@ export function ProjectManagerModal() {
                 <button
                   type="button"
                   onClick={handleCancel}
-                  className="px-4 py-2 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="px-4 py-2 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   Cancel
                 </button>
@@ -199,7 +199,7 @@ export function ProjectManagerModal() {
         <div className="space-y-6">
           <div>
             <div className="flex justify-between items-center mb-4">
-              <h3 className="font-medium text-gray-900">Active Projects</h3>
+              <h3 className="font-medium text-gray-900 dark:text-white">Active Projects</h3>
               <button
                 onClick={handleCreate}
                 className="px-3 py-1 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
@@ -209,7 +209,7 @@ export function ProjectManagerModal() {
             </div>
 
             {activeProjects.length === 0 ? (
-              <p className="text-gray-500 text-center py-4">No active projects</p>
+              <p className="text-gray-500 dark:text-gray-400 text-center py-4">No active projects</p>
             ) : (
               <div className="space-y-2">
                 {activeProjects.map((project) => (
@@ -227,7 +227,7 @@ export function ProjectManagerModal() {
 
           {archivedProjects.length > 0 && (
             <div>
-              <h3 className="font-medium text-gray-900 mb-4">Archived Projects</h3>
+              <h3 className="font-medium text-gray-900 dark:text-white mb-4">Archived Projects</h3>
               <div className="space-y-2">
                 {archivedProjects.map((project) => (
                   <ProjectItem
@@ -257,19 +257,19 @@ interface ProjectItemProps {
 function ProjectItem({ project, onEdit, onDelete, onArchive }: ProjectItemProps) {
   return (
     <div className={`
-      flex items-center justify-between p-3 border border-gray-200 rounded-lg
-      ${project.archived ? 'bg-gray-50 opacity-75' : 'bg-white hover:bg-gray-50'}
+      flex items-center justify-between p-3 border border-gray-200 dark:border-gray-700 rounded-lg
+      ${project.archived ? 'bg-gray-50 dark:bg-gray-700 opacity-75' : 'bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700'}
     `}>
       <div className="flex items-center">
         <div
           className="w-4 h-4 rounded-full mr-3 flex-shrink-0"
           style={{ backgroundColor: project.color }}
         />
-        <span className={`font-medium ${project.archived ? 'text-gray-500' : 'text-gray-900'}`}>
+        <span className={`font-medium ${project.archived ? 'text-gray-500 dark:text-gray-400' : 'text-gray-900 dark:text-white'}`}>
           {project.name}
         </span>
         {project.archived && (
-          <span className="ml-2 px-2 py-1 bg-gray-200 text-gray-600 text-xs rounded-full">
+          <span className="ml-2 px-2 py-1 bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300 text-xs rounded-full">
             Archived
           </span>
         )}
@@ -278,17 +278,17 @@ function ProjectItem({ project, onEdit, onDelete, onArchive }: ProjectItemProps)
       <div className="flex space-x-2">
         <button
           onClick={() => onEdit(project)}
-          className="text-blue-600 hover:text-blue-800 transition-colors p-1"
+          className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors p-1"
           aria-label="Edit project"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
           </svg>
         </button>
-        
+
         <button
           onClick={() => onArchive(project)}
-          className="text-orange-600 hover:text-orange-800 transition-colors p-1"
+          className="text-orange-600 dark:text-orange-400 hover:text-orange-800 dark:hover:text-orange-300 transition-colors p-1"
           aria-label={project.archived ? 'Unarchive project' : 'Archive project'}
         >
           {project.archived ? (
@@ -301,10 +301,10 @@ function ProjectItem({ project, onEdit, onDelete, onArchive }: ProjectItemProps)
             </svg>
           )}
         </button>
-        
+
         <button
           onClick={() => onDelete(project)}
-          className="text-red-600 hover:text-red-800 transition-colors p-1"
+          className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 transition-colors p-1"
           aria-label="Delete project"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
