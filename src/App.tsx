@@ -28,7 +28,7 @@ const AddEntryModal = lazy(() => import('./components/AddEntryModal').then(modul
 const ProjectManagerModal = lazy(() => import('./components/ProjectManagerModal').then(module => ({ default: module.ProjectManagerModal })));
 const ConfirmDialog = lazy(() => import('./components/ConfirmDialog').then(module => ({ default: module.ConfirmDialog })));
 
-type Tab = 'tracker' | 'history' | 'settings';
+type Tab = 'tracker' | 'history' | 'settings' | 'profile';
 
 export function App() {
   return (
@@ -42,14 +42,34 @@ function AppContent() {
   const isOnline = useOnlineStatus();
   const { reconcileProjects, startProjectSync, stopProjectSync } = useProjectsStore();
   const { getTodaySessions, startSync, stopSync } = useSessionsStore();
-  const { currentProjectId, setCurrentProject, openAddEntryModal } = useUIStore();
+  const { currentProjectId, setCurrentProject, openAddEntryModal, theme, setTheme } = useUIStore();
   const { user, setUserAndOrg, isLoading: isAuthLoading } = useAuthStore();
   const [isGuest, setIsGuest] = useState(false);
   const location = useLocation();
 
-  const activeTab: Tab = location.pathname === '/history' ? 'history' : location.pathname === '/settings' ? 'settings' : 'tracker';
+  const activeTab: Tab = location.pathname === '/history' ? 'history' : location.pathname === '/settings' ? 'settings' : location.pathname === '/profile' ? 'profile' : 'tracker';
 
   const { runningSession, getCurrentElapsed, loadSessions, loadRunningSession } = useSessionsStore();
+
+  // Apply theme to document root
+  useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [theme]);
+
+  // Load theme from database on mount
+  useEffect(() => {
+    const loadTheme = async () => {
+      const settings = await db.settings.toCollection().first();
+      if (settings?.theme) {
+        setTheme(settings.theme);
+      }
+    };
+    loadTheme();
+  }, [setTheme]);
 
   const initializeApp = useCallback(async (currentUser: User | null) => {
     await setUserAndOrg(currentUser);
@@ -62,7 +82,7 @@ function AppContent() {
     } else if (isGuest) {
       await loadSessions();
     }
-    
+
     if (currentUser || isGuest) {
       await loadRunningSession();
       const settings = await db.settings.toCollection().first();
@@ -70,7 +90,7 @@ function AppContent() {
         setCurrentProject(settings.lastProjectId);
       }
     }
-  }, [isGuest, setUserAndOrg, reconcileProjects, loadSessions, loadRunningSession, startSync, setCurrentProject, startProjectSync]);
+  }, [isGuest, setUserAndOrg, reconcileProjects, loadSessions, loadRunningSession, startSync, setCurrentProject, startProjectSync, setTheme]);
 
   useEffect(() => {
     // onAuthStateChanged returns an unsubscribe function that we can use for cleanup.
@@ -147,10 +167,10 @@ function AppContent() {
   };
 
   const loadingSpinner = (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
       <div className="text-center">
         <div className="spinner w-8 h-8 mx-auto mb-4"></div>
-        <p className="text-gray-600">Loading BuzTracker...</p>
+        <p className="text-gray-600 dark:text-gray-400">Loading BuzTracker...</p>
       </div>
     </div>
   );
@@ -171,14 +191,14 @@ function AppContent() {
   const todayTotal = getTotalDuration(todaySessions);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <a href="#main-content" className="skip-link">Skip to main content</a>
-      
-      <header className="sticky top-0 z-50 bg-white shadow-sm border-b border-gray-200">
+
+      <header className="sticky top-0 z-50 bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
-              <h1 className="text-2xl font-bold text-gray-900">BuzTracker</h1>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">BuzTracker</h1>
               {!isOnline && (
                 <div className="ml-2" title="You are currently offline.">
                   <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -187,12 +207,12 @@ function AppContent() {
                 </div>
               )}
               {activeTab === 'tracker' && (
-                <div className="ml-4 text-sm text-gray-600">
+                <div className="ml-4 text-sm text-gray-600 dark:text-gray-400">
                   Today: {formatDurationHHMM(todayTotal)}
                 </div>
               )}
             </div>
-            
+
             <div className="flex items-center space-x-4">
               <InstallButton />
               {(user || isGuest) && (
@@ -203,7 +223,7 @@ function AppContent() {
         </div>
       </header>
 
-      <nav className="sticky top-16 z-40 bg-white border-b border-gray-200" role="navigation" aria-label="Main navigation">
+      <nav className="sticky top-16 z-40 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700" role="navigation" aria-label="Main navigation">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex space-x-8">
             {[
@@ -213,7 +233,7 @@ function AppContent() {
               <Link
                 key={tab.id}
                 to={tab.path}
-                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === tab.id ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === tab.id ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'}`}
               >
                 {tab.label}
               </Link>
@@ -232,7 +252,7 @@ function AppContent() {
             <Route path="/" element={
               <div className="space-y-8">
                 <div className="max-w-md">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Current Project
                   </label>
                   <ProjectSelect />

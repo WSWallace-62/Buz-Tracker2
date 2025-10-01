@@ -32,13 +32,25 @@
   background: #f7fafc;
 }
 
+.dark .custom-scrollbar::-webkit-scrollbar-track {
+  background: #1f2937;
+}
+
 .custom-scrollbar::-webkit-scrollbar-thumb {
   background: #cbd5e0;
   border-radius: 20px; /* Adjust border-radius to match the new width */
 }
 
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #4b5563;
+}
+
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: #a0aec0;
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
 }
 
 /* Chart container responsive styles */
@@ -70,16 +82,20 @@
   @apply animate-spin rounded-full border-4 border-gray-200 border-t-blue-600;
 }
 
+.dark .spinner {
+@apply border-gray-700 border-t-blue-400;
+  }
+
 /* Table responsive styles */
 .table-responsive {
   @apply overflow-x-auto;
 }
 
 .table-responsive table {
-  @apply min-w-full;
-}
+@apply min-w-full;
+  }
 
-/* Mobile-first responsive design adjustments */
+  /* Mobile-first responsive design adjustments */
 @media (max-width: 640px) {
   .mobile-hidden {
     @apply hidden;
@@ -89,26 +105,42 @@
     @apply text-sm;
   }
 
-  .mobile-p-2 {
-    @apply p-2;
-  }
+.mobile-p-2 {
+@apply p-2;
 }
+  }
 
 /* Utility classes for better UX */
 .card {
   @apply bg-white rounded-lg shadow-md;
 }
 
+.dark .card {
+  @apply bg-gray-800;
+}
+
 .btn-primary {
   @apply px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors;
+}
+
+.dark .btn-primary {
+  @apply bg-blue-500 hover:bg-blue-600;
 }
 
 .btn-secondary {
   @apply px-4 py-2 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors;
 }
 
+.dark .btn-secondary {
+  @apply text-gray-300 border-gray-600 hover:bg-gray-700;
+}
+
 .btn-danger {
   @apply px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors;
+}
+
+.dark .btn-danger {
+  @apply bg-red-500 hover:bg-red-600;
 }
 
 /* Form input styles */
@@ -116,53 +148,57 @@
   @apply w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500;
 }
 
-/* Skip to content link for accessibility */
-.skip-link {
-  @apply absolute -top-10 left-6 bg-blue-600 text-white px-4 py-2 rounded-md z-50 focus:top-6 transition-all;
+.dark .input-field {
+  @apply bg-gray-700 border-gray-600 text-white;
 }
 
-/* --- Final Print Styles --- */
-@media print {
-  /* Hide the main app container when the report is active */
-  body.report-active > #root {
-    display: none;
+/* Skip to content link for accessibility */
+.skip-link {
+@apply absolute -top-10 left-6 bg-blue-600 text-white px-4 py-2 rounded-md z-50 focus:top-6 transition-all;
   }
 
+    /* --- Final Print Styles --- */
+  @media print {
+/* Hide the main app container when the report is active */
+  body.report-active > #root {
+  display: none;
+    }
+
   /* Make the portal container visible and static for printing */
-  .printable-report-container {
-    display: block !important;
-    position: static !important;
-  }
-  
-  /* Reset the inner report wrapper to be printable */
-  .printable-report {
+.printable-report-container {
+  display: block !important;
+  position: static !important;
+    }
+
+    /* Reset the inner report wrapper to be printable */
+    .printable-report {
     position: static !important;
     width: 100% !important;
     height: auto !important;
     overflow: visible !important;
-    box-shadow: none !important;
-    border: none !important;
-    margin: 0 !important;
-    padding: 0 !important;
-  }
-  
-  /* Hide any elements specifically marked not for printing */
-  .no-print {
-    display: none !important;
-  }
-}
+  box-shadow: none !important;
+border: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+    }
 
-/* Fix mobile horizontal scrolling issue for both iOS and Android */
-.custom-scrollbar {
-  -webkit-overflow-scrolling: touch;
-  touch-action: pan-x pan-y;
-  /* Additional Android-specific optimizations */
-  overscroll-behavior-x: contain;
+/* Hide any elements specifically marked not for printing */
+.no-print {
+display: none !important;
 }
+  }
 
-/* Ensure all overflow-x-auto containers work properly on mobile */
+  /* Fix mobile horizontal scrolling issue for both iOS and Android */
+  .custom-scrollbar {
+-webkit-overflow-scrolling: touch;
+touch-action: pan-x pan-y;
+/* Additional Android-specific optimizations */
+overscroll-behavior-x: contain;
+  }
+
+  /* Ensure all overflow-x-auto containers work properly on mobile */
 .overflow-x-auto {
-  -webkit-overflow-scrolling: touch;
-  touch-action: pan-x pan-y;
-  overscroll-behavior-x: contain;
+-webkit-overflow-scrolling: touch;
+touch-action: pan-x pan-y;
+overscroll-behavior-x: contain;
 }

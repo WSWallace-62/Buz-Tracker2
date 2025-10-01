@@ -181,13 +181,13 @@ export function Stopwatch({ projectId }: StopwatchProps) {
     <div
       ref={stopwatchRef}
       className={`
-        p-6 bg-white rounded-lg shadow-md border-2 transition-colors duration-200 focus:outline-none
+        p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md border-2 transition-colors duration-200 focus:outline-none
         ${
           isRunning && isCurrentProject
             ? isPaused
-              ? 'border-yellow-500 bg-yellow-50'
-              : 'border-green-500 bg-green-50'
-            : 'border-gray-200'
+              ? 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20'
+              : 'border-green-500 bg-green-50 dark:bg-green-900/20'
+            : 'border-gray-200 dark:border-gray-700'
         }
       `}
       tabIndex={0}
@@ -197,10 +197,10 @@ export function Stopwatch({ projectId }: StopwatchProps) {
       aria-live="polite"
     >
       <div className="relative">
-        <div className="absolute top-0 left-0 text-lg sm:text-sm font-medium text-gray-500">
+        <div className="absolute top-0 left-0 text-lg sm:text-sm font-medium text-gray-500 dark:text-gray-400">
           {currentTime}
         </div>
-        <div className="absolute top-0 right-0 text-lg sm:text-sm font-medium text-gray-500">
+        <div className="absolute top-0 right-0 text-lg sm:text-sm font-medium text-gray-500 dark:text-gray-400">
           {currentDate}
         </div>
       </div>
@@ -210,9 +210,9 @@ export function Stopwatch({ projectId }: StopwatchProps) {
           className={`text-4xl font-mono font-bold mb-4 ${
             isRunning && isCurrentProject
               ? isPaused
-                ? 'text-yellow-700'
-                : 'text-green-700'
-              : 'text-gray-700'
+                ? 'text-yellow-700 dark:text-yellow-400'
+                : 'text-green-700 dark:text-green-400'
+              : 'text-gray-700 dark:text-gray-300'
           }`}
         >
           {formatDuration(isRunning && isCurrentProject ? elapsed : 0)}
@@ -222,7 +222,7 @@ export function Stopwatch({ projectId }: StopwatchProps) {
           value={note}
           onChange={(e) => setNote(e.target.value)}
           placeholder="Add a note for this session..."
-          className="w-full border border-gray-300 rounded-md px-3 py-2 text-lg sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
+          className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md px-3 py-2 text-lg sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
           rows={2}
           disabled={isRunning}
         />
