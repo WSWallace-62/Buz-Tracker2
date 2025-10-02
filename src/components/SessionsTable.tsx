@@ -10,9 +10,10 @@ interface SessionsTableProps {
   showAllProjects?: boolean
   sessions?: Session[]
   title?: string
+  todayTotal?: number
 }
 
-export function SessionsTable({ projectId, showAllProjects = false, sessions: externalSessions, title }: SessionsTableProps) {
+export function SessionsTable({ projectId, showAllProjects = false, sessions: externalSessions, title, todayTotal }: SessionsTableProps) {
   const { getTodaySessions, deleteSession, loadSessions, continueSession, runningSession, sessions } = useSessionsStore()
   const { projects } = useProjectsStore()
   const { showConfirm, showToast } = useUIStore()
@@ -117,10 +118,15 @@ export function SessionsTable({ projectId, showAllProjects = false, sessions: ex
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
-      <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+      <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
           {title || (showAllProjects ? "Today's Sessions" : "Sessions Today")}
         </h3>
+        {todayTotal !== undefined && (
+          <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
+            Today: {formatDurationHHMM(todayTotal)} hours
+          </span>
+        )}
       </div>
 
       <div className="overflow-x-auto overflow-y-auto max-h-[18rem] custom-scrollbar">
