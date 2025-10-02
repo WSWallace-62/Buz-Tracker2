@@ -15,7 +15,7 @@ import { SessionsTable } from './components/SessionsTable';
 import { Toast } from './components/Toast';
 import { InstallButton } from './pwa/InstallButton';
 import { UserMenu } from './components/UserMenu';
-import { getTotalDuration, formatDurationHHMM, formatDuration } from './utils/time';
+import { getTotalDuration, formatDuration } from './utils/time';
 import { audioManager } from './utils/audioManager';
 import './styles.css';
 
@@ -206,11 +206,6 @@ function AppContent() {
                   </svg>
                 </div>
               )}
-              {activeTab === 'tracker' && (
-                <div className="ml-4 text-sm text-gray-600 dark:text-gray-400">
-                  Today: {formatDurationHHMM(todayTotal)}
-                </div>
-              )}
             </div>
 
             <div className="flex items-center space-x-4">
@@ -264,7 +259,7 @@ function AppContent() {
                     Add Session
                   </button>
                 </div>
-                <SessionsTable projectId={currentProjectId || undefined} />
+                <SessionsTable projectId={currentProjectId || undefined} todayTotal={todayTotal} />
               </div>
             } />
             <Route path="/history" element={<HistoryPanel />} />

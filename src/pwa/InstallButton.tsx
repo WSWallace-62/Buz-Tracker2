@@ -53,14 +53,7 @@ export function InstallButton() {
   }
 
   if (isInstalled) {
-    return (
-      <div className="flex items-center text-green-600 text-sm">
-        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-        </svg>
-        App Installed
-      </div>
-    )
+    return null
   }
 
   if (!isInstallable) {
