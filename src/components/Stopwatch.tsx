@@ -2,8 +2,10 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useSessionsStore } from '../store/sessions';
 import { useUIStore } from '../store/ui';
+import { usePredefinedNotesStore } from '../store/predefinedNotes';
 import { formatDuration, formatDate, formatTime } from '../utils/time';
 import { useNotificationSettingsStore } from '../store/notificationSettings';
+import { ManagePredefinedNotesModal } from './ManagePredefinedNotesModal';
 
 interface StopwatchProps {
   projectId: number | null;
@@ -22,9 +24,11 @@ export function Stopwatch({ projectId }: StopwatchProps) {
   } = useSessionsStore();
 
   const { showConfirm, showToast } = useUIStore();
+  const { predefinedNotes, loadPredefinedNotes } = usePredefinedNotesStore();
   const { loadSettings: loadNotificationSettings } = useNotificationSettingsStore();
   const [elapsed, setElapsed] = useState(0);
   const [note, setNote] = useState('');
+  const [isManageNotesOpen, setIsManageNotesOpen] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout>();
   const stopwatchRef = useRef<HTMLDivElement>(null);
 
@@ -39,7 +43,8 @@ export function Stopwatch({ projectId }: StopwatchProps) {
   useEffect(() => {
     loadRunningSession();
     loadNotificationSettings();
-  }, [loadRunningSession, loadNotificationSettings]);
+    loadPredefinedNotes();
+  }, [loadRunningSession, loadNotificationSettings, loadPredefinedNotes]);
 
   useEffect(() => {
     if (runningSession?.note && !isRunning) {
@@ -177,125 +182,171 @@ export function Stopwatch({ projectId }: StopwatchProps) {
   const canEnd = isRunning && isCurrentProject;
   const canPause = isRunning && isCurrentProject;
 
-  return (
-    <div
-      ref={stopwatchRef}
-      className={`
-        p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md border-2 transition-colors duration-200 focus:outline-none
-        ${
-          isRunning && isCurrentProject
-            ? isPaused
-              ? 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20'
-              : 'border-green-500 bg-green-50 dark:bg-green-900/20'
-            : 'border-gray-200 dark:border-gray-700'
-        }
-      `}
-      tabIndex={0}
-      onKeyDown={handleKeyDown}
-      role="timer"
-      aria-label="Stopwatch"
-      aria-live="polite"
-    >
-      <div className="relative">
-        <div className="absolute top-0 left-0 text-lg sm:text-sm font-medium text-gray-500 dark:text-gray-400">
-          {currentTime}
-        </div>
-        <div className="absolute top-0 right-0 text-lg sm:text-sm font-medium text-gray-500 dark:text-gray-400">
-          {currentDate}
-        </div>
-      </div>
+  const handlePredefinedNoteSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const selectedNote = e.target.value;
+    if (selectedNote === '__manage__') {
+      setIsManageNotesOpen(true);
+    } else if (selectedNote) {
+      setNote(selectedNote);
+    }
+    // Reset the dropdown to placeholder
+    e.target.value = '';
+  };
 
-      <div className="text-center pt-8">
-        <div
-          className={`text-4xl font-mono font-bold mb-4 ${
+  return (
+    <>
+      <ManagePredefinedNotesModal 
+        isOpen={isManageNotesOpen} 
+        onClose={() => setIsManageNotesOpen(false)} 
+      />
+      
+      <div
+        ref={stopwatchRef}
+        className={`
+          p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md border-2 transition-colors duration-200 focus:outline-none
+          ${
             isRunning && isCurrentProject
               ? isPaused
-                ? 'text-yellow-700 dark:text-yellow-400'
-                : 'text-green-700 dark:text-green-400'
-              : 'text-gray-700 dark:text-gray-300'
-          }`}
-        >
-          {formatDuration(isRunning && isCurrentProject ? elapsed : 0)}
+                ? 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20'
+                : 'border-green-500 bg-green-50 dark:bg-green-900/20'
+              : 'border-gray-200 dark:border-gray-700'
+          }
+        `}
+        tabIndex={0}
+        onKeyDown={handleKeyDown}
+        role="timer"
+        aria-label="Stopwatch"
+        aria-live="polite"
+      >
+        <div className="relative">
+          <div className="absolute top-0 left-0 text-lg sm:text-sm font-medium text-gray-500 dark:text-gray-400">
+            {currentTime}
+          </div>
+          <div className="absolute top-0 right-0 text-lg sm:text-sm font-medium text-gray-500 dark:text-gray-400">
+            {currentDate}
+          </div>
         </div>
 
-        <textarea
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          placeholder="Add a note for this session..."
-          className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md px-3 py-2 text-lg sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
-          rows={2}
-          disabled={isRunning}
-        />
-        <div className="flex justify-center space-x-2 sm:space-x-3">
-          <button
-            onClick={handleStart}
-            disabled={!canStart}
-            className={`
-              px-4 sm:px-6 py-2 rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2
-              ${
-                canStart
-                  ? 'bg-green-600 text-white hover:bg-green-700 focus:ring-green-500'
-                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              }
-            `}
-            aria-label="Start timer"
-          >
-            {isRunning && !isCurrentProject ? 'Switch & Start' : 'Start'}
-          </button>
+        <div className="text-center pt-8">
+          {/* Timer display - larger when running */}
+          {isRunning && isCurrentProject ? (
+            <div
+              className={`text-6xl font-mono font-bold mb-4 ${
+                isPaused
+                  ? 'text-yellow-700 dark:text-yellow-400'
+                  : 'text-green-700 dark:text-green-400'
+              }`}
+            >
+              {formatDuration(elapsed)}
+            </div>
+          ) : null}
 
-          <button
-            onClick={handlePauseToggle}
-            disabled={!canPause}
-            className={`
-              px-4 sm:px-6 py-2 rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2
-              ${
-                canPause
-                  ? isPaused
-                    ? 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500'
-                    : 'bg-yellow-500 text-white hover:bg-yellow-600 focus:ring-yellow-500'
-                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              }
-            `}
-            aria-label={isPaused ? 'Resume timer' : 'Pause timer'}
-          >
-            {isPaused ? 'Resume' : 'Pause'}
-          </button>
+          {/* Predefined notes dropdown - only visible when NOT running */}
+          {(!isRunning || !isCurrentProject) && (
+            <div className="mb-3">
+              <select
+                onChange={handlePredefinedNoteSelect}
+                className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md px-3 py-2 text-lg sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                aria-label="Select predefined note"
+                defaultValue=""
+              >
+                <option value="" disabled>
+                  Select a predefined note...
+                </option>
+                {predefinedNotes.map((predefinedNote) => (
+                  <option key={predefinedNote.id} value={predefinedNote.note}>
+                    {predefinedNote.note}
+                  </option>
+                ))}
+                <option value="__manage__" className="font-semibold">
+                  ⚙️ Manage Notes...
+                </option>
+              </select>
+            </div>
+          )}
 
-          <button
-            onClick={handleReset}
-            className={`
-              px-4 sm:px-6 py-2 rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2
-              bg-gray-600 text-white hover:bg-gray-700 focus:ring-gray-500
-            `}
-            aria-label="Reset timer"
-          >
-            Reset
-          </button>
+          {/* Note textarea - only visible when NOT running, height reduced */}
+          {(!isRunning || !isCurrentProject) && (
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Add a note for this session..."
+              className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md px-3 py-1.5 text-lg sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
+              rows={1}
+            />
+          )}
 
-          <button
-            onClick={handleEnd}
-            disabled={!canEnd}
-            className={`
-              px-4 sm:px-6 py-2 rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2
-              ${
-                canEnd
-                  ? 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500'
-                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              }
-            `}
-            aria-label="End timer"
-          >
-            End
-          </button>
+          <div className="flex justify-center space-x-2 sm:space-x-3">
+            <button
+              onClick={handleStart}
+              disabled={!canStart}
+              className={`
+                px-4 sm:px-6 py-2 rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2
+                ${
+                  canStart
+                    ? 'bg-green-600 text-white hover:bg-green-700 focus:ring-green-500'
+                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                }
+              `}
+              aria-label="Start timer"
+            >
+              {isRunning && !isCurrentProject ? 'Switch & Start' : 'Start'}
+            </button>
+
+            <button
+              onClick={handlePauseToggle}
+              disabled={!canPause}
+              className={`
+                px-4 sm:px-6 py-2 rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2
+                ${
+                  canPause
+                    ? isPaused
+                      ? 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500'
+                      : 'bg-yellow-500 text-white hover:bg-yellow-600 focus:ring-yellow-500'
+                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                }
+              `}
+              aria-label={isPaused ? 'Resume timer' : 'Pause timer'}
+            >
+              {isPaused ? 'Resume' : 'Pause'}
+            </button>
+
+            <button
+              onClick={handleReset}
+              className={`
+                px-4 sm:px-6 py-2 rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2
+                bg-gray-600 text-white hover:bg-gray-700 focus:ring-gray-500
+              `}
+              aria-label="Reset timer"
+            >
+              Reset
+            </button>
+
+            <button
+              onClick={handleEnd}
+              disabled={!canEnd}
+              className={`
+                px-4 sm:px-6 py-2 rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2
+                ${
+                  canEnd
+                    ? 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500'
+                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                }
+              `}
+              aria-label="End timer"
+            >
+              End
+            </button>
+          </div>
+
+          {isRunning && !isCurrentProject && (
+            <p className="mt-3 text-sm text-orange-600">
+              Another project session is running. Click "Switch & Start" to stop it and start this one.
+            </p>
+          )}
+
         </div>
-
-        {isRunning && !isCurrentProject && (
-          <p className="mt-3 text-sm text-orange-600">
-            Another project session is running. Click "Switch & Start" to stop it and start this one.
-          </p>
-        )}
-
       </div>
-    </div>
+    </>
   );
 }

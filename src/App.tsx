@@ -6,6 +6,7 @@ import { useProjectsStore } from './store/projects';
 import { useSessionsStore } from './store/sessions';
 import { useUIStore } from './store/ui';
 import { useAuthStore } from './store/auth';
+import { usePredefinedNotesStore } from './store/predefinedNotes';
 import { db, clearDatabase } from './db/dexie';
 import { auth } from './firebase';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
@@ -42,6 +43,7 @@ function AppContent() {
   const isOnline = useOnlineStatus();
   const { reconcileProjects, startProjectSync, stopProjectSync } = useProjectsStore();
   const { getTodaySessions, startSync, stopSync } = useSessionsStore();
+  const { startPredefinedNotesSync, stopPredefinedNotesSync } = usePredefinedNotesStore();
   const { currentProjectId, setCurrentProject, openAddEntryModal, theme, setTheme } = useUIStore();
   const { user, setUserAndOrg, isLoading: isAuthLoading } = useAuthStore();
   const [isGuest, setIsGuest] = useState(false);
@@ -79,6 +81,7 @@ function AppContent() {
       await reconcileProjects();
       startProjectSync();
       startSync();
+      startPredefinedNotesSync();
     } else if (isGuest) {
       await loadSessions();
     }
@@ -90,18 +93,19 @@ function AppContent() {
         setCurrentProject(settings.lastProjectId);
       }
     }
-  }, [isGuest, setUserAndOrg, reconcileProjects, loadSessions, loadRunningSession, startSync, setCurrentProject, startProjectSync]);
+  }, [isGuest, setUserAndOrg, reconcileProjects, loadSessions, loadRunningSession, startSync, setCurrentProject, startProjectSync, startPredefinedNotesSync]);
 
   useEffect(() => {
     // onAuthStateChanged returns an unsubscribe function that we can use for cleanup.
     const unsubscribe = onAuthStateChanged(auth, initializeApp);
-    
+
     return () => {
       unsubscribe();
       stopProjectSync();
       stopSync();
+      stopPredefinedNotesSync();
     };
-  }, [initializeApp, stopProjectSync, stopSync]);
+  }, [initializeApp, stopProjectSync, stopSync, stopPredefinedNotesSync]);
 
   useEffect(() => {
     const defaultTitle = "BuzTracker - Time Tracker";
