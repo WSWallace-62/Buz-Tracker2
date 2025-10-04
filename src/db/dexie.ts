@@ -1,11 +1,34 @@
 import Dexie, { Table } from 'dexie'
 
+export interface Contact {
+  name: string
+  email: string
+}
+
+export interface Customer {
+  id?: number
+  companyName: string
+  address: string
+  city: string
+  province: string
+  postalCode: string
+  country: string
+  contacts: Contact[]
+  standardRate: number
+  travelRate: number
+  currency: string
+  createdAt: number
+  archived: boolean
+  firestoreId?: string
+}
+
 export interface Project {
   id?: number
   name: string
   color: string
   createdAt: number
   archived: boolean
+  customerId?: number
   firestoreId?: string;
 }
 
@@ -58,24 +81,26 @@ export class BuzTrackerDB extends Dexie {
   settings!: Table<Settings>
   runningSession!: Table<RunningSession>
   predefinedNotes!: Table<PredefinedNote>
+  customers!: Table<Customer>
 
   constructor() {
     super('BuzTrackerDB')
 
-    // FIX: Bump DB version to be higher than existing (611)
-    this.version(612).stores({
-      projects: '++id, firestoreId, name, createdAt, archived',
+    // Bump DB version to 613 to add customers table
+    this.version(613).stores({
+      projects: '++id, firestoreId, name, createdAt, archived, customerId',
       sessions: '++id, projectId, firestoreId, start, stop, createdAt, *note',
       settings: '++id',
       runningSession: '++id, running, projectId, startTs, isPaused, continuedFromSessionId',
-      predefinedNotes: '++id, firestoreId, note, createdAt'
+      predefinedNotes: '++id, firestoreId, note, createdAt',
+      customers: '++id, firestoreId, companyName, createdAt, archived'
     })
 
     this.on('ready', () => this.initializeDatabase());
   }
 
   async initializeDatabase() {
-    await this.transaction('rw', this.projects, this.settings, this.predefinedNotes, async () => {
+    await this.transaction('rw', this.projects, this.settings, this.predefinedNotes, this.customers, async () => {
       // Initialize default settings
       const settingsCount = await this.settings.count();
       if (settingsCount === 0) {
@@ -88,15 +113,50 @@ export class BuzTrackerDB extends Dexie {
         });
       }
 
+      // Initialize default customer (KJ Controls)
+      const customersCount = await this.customers.count();
+      if (customersCount === 0) {
+        await this.customers.add({
+          companyName: 'KJ Controls',
+          address: '1983 Main Road',
+          city: 'Nanaimo',
+          province: 'BC',
+          postalCode: 'V9X-1T6',
+          country: 'Canada',
+          contacts: [
+            { name: 'James Boileau', email: '' },
+            { name: 'Burke Bridges', email: '' }
+          ],
+          standardRate: 90,
+          travelRate: 55,
+          currency: 'CAD',
+          createdAt: Date.now(),
+          archived: false
+        });
+      }
+
       // Initialize default project
       const projectsCount = await this.projects.count();
       if (projectsCount === 0) {
+        // Get the KJ Controls customer ID
+        const kjControls = await this.customers.where('companyName').equals('KJ Controls').first();
+
         await this.projects.add({
           name: 'Default Project',
           color: '#3b82f6',
           createdAt: Date.now(),
-          archived: false
+          archived: false,
+          customerId: kjControls?.id
         });
+      } else {
+        // Migration: Link "Parksville Water System" to KJ Controls if it exists
+        const parksvilleProject = await this.projects.where('name').equals('Parksville Water System').first();
+        const kjControls = await this.customers.where('companyName').equals('KJ Controls').first();
+
+        if (parksvilleProject && kjControls && !parksvilleProject.customerId) {
+          await this.projects.update(parksvilleProject.id!, { customerId: kjControls.id });
+          console.log('Linked Parksville Water System to KJ Controls');
+        }
       }
 
       // Initialize default predefined notes
@@ -123,16 +183,14 @@ export class BuzTrackerDB extends Dexie {
 export const db = new BuzTrackerDB()
 
 export async function clearDatabase() {
-  await db.transaction('rw', db.projects, db.sessions, db.settings, db.runningSession, db.predefinedNotes, async () => {
-    await Promise.all([
-      db.projects.clear(),
-      db.sessions.clear(),
-      db.settings.clear(),
-      db.runningSession.clear(),
-      db.predefinedNotes.clear(),
-    ]);
-  });
-  console.log('Local database cleared.');
+  await Promise.all([
+    db.projects.clear(),
+    db.sessions.clear(),
+    db.settings.clear(),
+    db.runningSession.clear(),
+    db.predefinedNotes.clear(),
+    db.customers.clear()
+  ]);
 }
 
 // FIX: Export a standalone function to be called from App.tsx

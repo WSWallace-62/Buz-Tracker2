@@ -7,6 +7,7 @@ import { useSessionsStore } from './store/sessions';
 import { useUIStore } from './store/ui';
 import { useAuthStore } from './store/auth';
 import { usePredefinedNotesStore } from './store/predefinedNotes';
+import { useCustomersStore } from './store/customers';
 import { db, clearDatabase } from './db/dexie';
 import { auth } from './firebase';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
@@ -24,12 +25,13 @@ import './styles.css';
 const HistoryPanel = lazy(() => import('./components/HistoryPanel').then(module => ({ default: module.HistoryPanel })));
 const SettingsPage = lazy(() => import('./pages/SettingsPage').then(module => ({ default: module.SettingsPage })));
 const ProfilePage = lazy(() => import('./pages/ProfilePage').then(module => ({ default: module.ProfilePage })));
+const CustomersPage = lazy(() => import('./pages/CustomersPage'));
 const Auth = lazy(() => import('./components/Auth').then(module => ({ default: module.Auth })));
 const AddEntryModal = lazy(() => import('./components/AddEntryModal').then(module => ({ default: module.AddEntryModal })));
 const ProjectManagerModal = lazy(() => import('./components/ProjectManagerModal').then(module => ({ default: module.ProjectManagerModal })));
 const ConfirmDialog = lazy(() => import('./components/ConfirmDialog').then(module => ({ default: module.ConfirmDialog })));
 
-type Tab = 'tracker' | 'history' | 'settings' | 'profile';
+type Tab = 'tracker' | 'history' | 'settings' | 'profile' | 'customers';
 
 export function App() {
   return (
@@ -44,12 +46,13 @@ function AppContent() {
   const { reconcileProjects, startProjectSync, stopProjectSync } = useProjectsStore();
   const { getTodaySessions, startSync, stopSync } = useSessionsStore();
   const { startPredefinedNotesSync, stopPredefinedNotesSync } = usePredefinedNotesStore();
+  const { startCustomerSync, stopCustomerSync, loadCustomers } = useCustomersStore();
   const { currentProjectId, setCurrentProject, openAddEntryModal, theme, setTheme } = useUIStore();
   const { user, setUserAndOrg, isLoading: isAuthLoading } = useAuthStore();
   const [isGuest, setIsGuest] = useState(false);
   const location = useLocation();
 
-  const activeTab: Tab = location.pathname === '/history' ? 'history' : location.pathname === '/settings' ? 'settings' : location.pathname === '/profile' ? 'profile' : 'tracker';
+  const activeTab: Tab = location.pathname === '/history' ? 'history' : location.pathname === '/settings' ? 'settings' : location.pathname === '/profile' ? 'profile' : location.pathname === '/customers' ? 'customers' : 'tracker';
 
   const { runningSession, getCurrentElapsed, loadSessions, loadRunningSession } = useSessionsStore();
 
@@ -72,7 +75,6 @@ function AppContent() {
     };
     loadTheme();
   }, [setTheme]);
-
   const initializeApp = useCallback(async (currentUser: User | null) => {
     await setUserAndOrg(currentUser);
 
@@ -82,8 +84,10 @@ function AppContent() {
       startProjectSync();
       startSync();
       startPredefinedNotesSync();
+      startCustomerSync();
     } else if (isGuest) {
       await loadSessions();
+      await loadCustomers();
     }
 
     if (currentUser || isGuest) {
@@ -93,7 +97,7 @@ function AppContent() {
         setCurrentProject(settings.lastProjectId);
       }
     }
-  }, [isGuest, setUserAndOrg, reconcileProjects, loadSessions, loadRunningSession, startSync, setCurrentProject, startProjectSync, startPredefinedNotesSync]);
+  }, [isGuest, setUserAndOrg, reconcileProjects, loadSessions, loadRunningSession, startSync, setCurrentProject, startProjectSync, startPredefinedNotesSync, startCustomerSync, loadCustomers]);
 
   useEffect(() => {
     // onAuthStateChanged returns an unsubscribe function that we can use for cleanup.
@@ -159,6 +163,8 @@ function AppContent() {
   const handleLogout = async () => {
     stopProjectSync();
     stopSync();
+    stopPredefinedNotesSync();
+    stopCustomerSync();
     if (auth) {
       await signOut(auth);
     }
@@ -169,7 +175,6 @@ function AppContent() {
     setIsGuest(false);
     await db.on.ready.fire(db);
   };
-
   const loadingSpinner = (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
       <div className="text-center">
@@ -266,6 +271,7 @@ function AppContent() {
                 <SessionsTable projectId={currentProjectId || undefined} todayTotal={todayTotal} />
               </div>
             } />
+            <Route path="/customers" element={<CustomersPage />} />
             <Route path="/history" element={<HistoryPanel />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/settings" element={<SettingsPage />} />

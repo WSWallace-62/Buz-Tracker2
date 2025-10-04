@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useProjectsStore } from '../store/projects'
+import { useCustomersStore } from '../store/customers'
 import { useUIStore } from '../store/ui'
 import { Project } from '../db/dexie'
 
@@ -11,22 +12,29 @@ const COLORS = [
 
 export function ProjectManagerModal() {
   const { projects, createProject, updateProject, deleteProject, archiveProject } = useProjectsStore()
+  const { customers, loadCustomers } = useCustomersStore()
   const { isProjectManagerOpen, closeProjectManager, showConfirm, showToast } = useUIStore()
   const [editingProject, setEditingProject] = useState<Project | null>(null)
   const [isCreating, setIsCreating] = useState(false)
-  const [formData, setFormData] = useState({ name: '', color: COLORS[0] })
+  const [formData, setFormData] = useState({ name: '', color: COLORS[0], customerId: undefined as number | undefined })
+
+  useEffect(() => {
+    if (isProjectManagerOpen) {
+      loadCustomers();
+    }
+  }, [isProjectManagerOpen, loadCustomers]);
 
   useEffect(() => {
     if (!isProjectManagerOpen) {
       setEditingProject(null)
       setIsCreating(false)
-      setFormData({ name: '', color: COLORS[0] })
+      setFormData({ name: '', color: COLORS[0], customerId: undefined })
     }
   }, [isProjectManagerOpen])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!formData.name.trim()) {
       showToast('Project name is required', 'error')
       return
@@ -36,21 +44,23 @@ export function ProjectManagerModal() {
       if (editingProject) {
         await updateProject(editingProject.id!, {
           name: formData.name.trim(),
-          color: formData.color
+          color: formData.color,
+          customerId: formData.customerId
         })
         showToast('Project updated', 'success')
       } else {
         await createProject({
           name: formData.name.trim(),
           color: formData.color,
+          customerId: formData.customerId,
           archived: false
         })
         showToast('Project created', 'success')
       }
-      
+
       setEditingProject(null)
       setIsCreating(false)
-      setFormData({ name: '', color: COLORS[0] })
+      setFormData({ name: '', color: COLORS[0], customerId: undefined })
     } catch (error) {
       showToast('Failed to save project', 'error')
     }
@@ -58,14 +68,14 @@ export function ProjectManagerModal() {
 
   const handleEdit = (project: Project) => {
     setEditingProject(project)
-    setFormData({ name: project.name, color: project.color })
+    setFormData({ name: project.name, color: project.color, customerId: project.customerId })
     setIsCreating(false)
   }
 
   const handleCreate = () => {
     setIsCreating(true)
     setEditingProject(null)
-    setFormData({ name: '', color: COLORS[0] })
+    setFormData({ name: '', color: COLORS[0], customerId: undefined })
   }
 
   const handleDelete = (project: Project) => {
@@ -94,7 +104,7 @@ export function ProjectManagerModal() {
   const handleCancel = () => {
     setEditingProject(null)
     setIsCreating(false)
-    setFormData({ name: '', color: COLORS[0] })
+    setFormData({ name: '', color: COLORS[0], customerId: undefined })
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -154,6 +164,24 @@ export function ProjectManagerModal() {
                   autoFocus
                   required
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Customer (Optional)
+                </label>
+                <select
+                  value={formData.customerId || ''}
+                  onChange={(e) => setFormData({ ...formData, customerId: e.target.value ? Number(e.target.value) : undefined })}
+                  className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">No customer</option>
+                  {customers.filter(c => !c.archived).map((customer) => (
+                    <option key={customer.id} value={customer.id}>
+                      {customer.companyName}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>
@@ -253,6 +281,7 @@ interface ProjectItemProps {
   onDelete: (project: Project) => void
   onArchive: (project: Project) => void
 }
+
 
 function ProjectItem({ project, onEdit, onDelete, onArchive }: ProjectItemProps) {
   return (
