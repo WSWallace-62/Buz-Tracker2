@@ -16,7 +16,7 @@ export function ProjectManagerModal() {
   const { isProjectManagerOpen, closeProjectManager, showConfirm, showToast } = useUIStore()
   const [editingProject, setEditingProject] = useState<Project | null>(null)
   const [isCreating, setIsCreating] = useState(false)
-  const [formData, setFormData] = useState({ name: '', color: COLORS[0], customerId: undefined as number | undefined })
+  const [formData, setFormData] = useState({ name: '', color: COLORS[0], customerFirestoreId: undefined as string | undefined })
 
   useEffect(() => {
     if (isProjectManagerOpen) {
@@ -28,7 +28,7 @@ export function ProjectManagerModal() {
     if (!isProjectManagerOpen) {
       setEditingProject(null)
       setIsCreating(false)
-      setFormData({ name: '', color: COLORS[0], customerId: undefined })
+      setFormData({ name: '', color: COLORS[0], customerFirestoreId: undefined })
     }
   }, [isProjectManagerOpen])
 
@@ -41,18 +41,25 @@ export function ProjectManagerModal() {
     }
 
     try {
+      // Find the customer's local ID for backward compatibility
+      const customer = formData.customerFirestoreId
+        ? customers.find(c => c.firestoreId === formData.customerFirestoreId)
+        : undefined;
+
       if (editingProject) {
         await updateProject(editingProject.id!, {
           name: formData.name.trim(),
           color: formData.color,
-          customerId: formData.customerId
+          customerId: customer?.id,
+          customerFirestoreId: formData.customerFirestoreId
         })
         showToast('Project updated', 'success')
       } else {
         await createProject({
           name: formData.name.trim(),
           color: formData.color,
-          customerId: formData.customerId,
+          customerId: customer?.id,
+          customerFirestoreId: formData.customerFirestoreId,
           archived: false
         })
         showToast('Project created', 'success')
@@ -60,7 +67,7 @@ export function ProjectManagerModal() {
 
       setEditingProject(null)
       setIsCreating(false)
-      setFormData({ name: '', color: COLORS[0], customerId: undefined })
+      setFormData({ name: '', color: COLORS[0], customerFirestoreId: undefined })
     } catch (error) {
       showToast('Failed to save project', 'error')
     }
@@ -68,14 +75,14 @@ export function ProjectManagerModal() {
 
   const handleEdit = (project: Project) => {
     setEditingProject(project)
-    setFormData({ name: project.name, color: project.color, customerId: project.customerId })
+    setFormData({ name: project.name, color: project.color, customerFirestoreId: project.customerFirestoreId })
     setIsCreating(false)
   }
 
   const handleCreate = () => {
     setIsCreating(true)
     setEditingProject(null)
-    setFormData({ name: '', color: COLORS[0], customerId: undefined })
+    setFormData({ name: '', color: COLORS[0], customerFirestoreId: undefined })
   }
 
   const handleDelete = (project: Project) => {
@@ -104,7 +111,7 @@ export function ProjectManagerModal() {
   const handleCancel = () => {
     setEditingProject(null)
     setIsCreating(false)
-    setFormData({ name: '', color: COLORS[0], customerId: undefined })
+    setFormData({ name: '', color: COLORS[0], customerFirestoreId: undefined })
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -171,13 +178,13 @@ export function ProjectManagerModal() {
                   Customer (Optional)
                 </label>
                 <select
-                  value={formData.customerId || ''}
-                  onChange={(e) => setFormData({ ...formData, customerId: e.target.value ? Number(e.target.value) : undefined })}
+                  value={formData.customerFirestoreId || ''}
+                  onChange={(e) => setFormData({ ...formData, customerFirestoreId: e.target.value || undefined })}
                   className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">No customer</option>
                   {customers.filter(c => !c.archived).map((customer) => (
-                    <option key={customer.id} value={customer.id}>
+                    <option key={customer.id} value={customer.firestoreId}>
                       {customer.companyName}
                     </option>
                   ))}
@@ -284,6 +291,11 @@ interface ProjectItemProps {
 
 
 function ProjectItem({ project, onEdit, onDelete, onArchive }: ProjectItemProps) {
+  const { customers } = useCustomersStore();
+  const customer = project.customerFirestoreId 
+    ? customers.find(c => c.firestoreId === project.customerFirestoreId)
+    : undefined;
+
   return (
     <div className={`
       flex items-center justify-between p-3 border border-gray-200 dark:border-gray-700 rounded-lg
@@ -294,9 +306,16 @@ function ProjectItem({ project, onEdit, onDelete, onArchive }: ProjectItemProps)
           className="w-4 h-4 rounded-full mr-3 flex-shrink-0"
           style={{ backgroundColor: project.color }}
         />
-        <span className={`font-medium ${project.archived ? 'text-gray-500 dark:text-gray-400' : 'text-gray-900 dark:text-white'}`}>
-          {project.name}
-        </span>
+        <div className="flex flex-col">
+          <span className={`font-medium ${project.archived ? 'text-gray-500 dark:text-gray-400' : 'text-gray-900 dark:text-white'}`}>
+            {project.name}
+          </span>
+          {customer && (
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              {customer.companyName}
+            </span>
+          )}
+        </div>
         {project.archived && (
           <span className="ml-2 px-2 py-1 bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300 text-xs rounded-full">
             Archived

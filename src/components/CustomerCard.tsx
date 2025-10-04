@@ -19,8 +19,14 @@ export function CustomerCard({ customer, onEdit }: CustomerCardProps) {
 
   // Get projects linked to this customer
   const projects = useLiveQuery(
-    () => db.projects.where('customerId').equals(customer.id!).toArray(),
-    [customer.id]
+    () => {
+      if (!customer.firestoreId) {
+        // Fallback to customerId for backward compatibility
+        return db.projects.where('customerId').equals(customer.id!).toArray();
+      }
+      return db.projects.where('customerFirestoreId').equals(customer.firestoreId).toArray();
+    },
+    [customer.id, customer.firestoreId]
   );
 
   const projectCount = projects?.length || 0;
