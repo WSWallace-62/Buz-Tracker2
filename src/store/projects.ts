@@ -49,10 +49,18 @@ export const useProjectsStore = create<ProjectsState>((set, get) => ({
     const projectsCollection = query(collection(firestoreDB, 'users', user.uid, 'projects'));
 
     unsubscribeFromProjects = onSnapshot(projectsCollection, async (snapshot) => {
-      await db.transaction('rw', db.projects, async () => {
+      await db.transaction('rw', db.projects, db.customers, async () => {
         for (const change of snapshot.docChanges()) {
           const fsProject = { ...change.doc.data(), firestoreId: change.doc.id } as Project;
           const existingProject = await db.projects.where('firestoreId').equals(fsProject.firestoreId!).first();
+
+          // If the project has a customerFirestoreId, find the local customer ID
+          if (fsProject.customerFirestoreId) {
+            const customer = await db.customers.where('firestoreId').equals(fsProject.customerFirestoreId).first();
+            if (customer) {
+              fsProject.customerId = customer.id;
+            }
+          }
 
           switch (change.type) {
             case 'added':
@@ -227,31 +235,39 @@ if (!user) {
     reconcileProjects: async () => {
     const { user } = useAuthStore.getState()
 if (!user) return; // Not logged in, nothing to reconcile
-    
+
       set({ isLoading: true, error: null });
 console.log("Reconciling projects...");
-      
+
 try {
       if (!firestoreDB) throw new Error("Firestore not initialized");
-      
+
       const projectsCol = collection(firestoreDB, 'users', user.uid, 'projects');
-      
+
 // 1. Fetch all data from both sources
       const firestoreSnapshot = await getDocs(projectsCol);
       const firestoreProjects = firestoreSnapshot.docs.map(doc => ({ ...doc.data(), firestoreId: doc.id } as Project));
 const dexieProjects = await db.projects.toArray();
-      
+
       const dexieProjectsByName = new Map(dexieProjects.map(p => [p.name, p]));
         const firestoreProjectsByName = new Map(firestoreProjects.map(p => [p.name, p]));
-        
+
           // 2. Sync Firestore projects down to Dexie
           for (const fsProject of firestoreProjects) {
+            // If the project has a customerFirestoreId, find the local customer ID
+            if (fsProject.customerFirestoreId) {
+              const customer = await db.customers.where('firestoreId').equals(fsProject.customerFirestoreId).first();
+              if (customer) {
+                fsProject.customerId = customer.id;
+              }
+            }
+
             const dexieMatch = dexieProjectsByName.get(fsProject.name);
             if (dexieMatch) {
           // Project exists in Dexie, check if firestoreId is missing
         if (!dexieMatch.firestoreId && dexieMatch.id) {
           console.log(`Reconcile: Updating Dexie project "${fsProject.name}" with Firestore ID.`);
-          await db.projects.update(dexieMatch.id, { firestoreId: fsProject.firestoreId });
+          await db.projects.update(dexieMatch.id, { firestoreId: fsProject.firestoreId, customerFirestoreId: fsProject.customerFirestoreId, customerId: fsProject.customerId });
           }
         } else {
       // Project does not exist in Dexie, add it
@@ -259,7 +275,7 @@ console.log(`Reconcile: Adding Firestore project "${fsProject.name}" to Dexie.`)
       await db.projects.add(fsProject);
       }
         }
-          
+
           // 3. Sync Dexie projects up to Firestore
           for (const dxProject of dexieProjects) {
           if (!dxProject.firestoreId) {
@@ -270,7 +286,7 @@ console.log(`Reconcile: Adding Firestore project "${fsProject.name}" to Dexie.`)
             // A project with this name was created on another device. Link them.
           if(dxProject.id) {
             console.log(`Reconcile: Linking offline Dexie project "${dxProject.name}" to existing Firestore project.`);
-            await db.projects.update(dxProject.id, { firestoreId: firestoreMatch.firestoreId });
+            await db.projects.update(dxProject.id, { firestoreId: firestoreMatch.firestoreId, customerFirestoreId: firestoreMatch.customerFirestoreId, customerId: firestoreMatch.customerId });
             }
             } else {
             // This is a new offline project, upload it.
@@ -288,7 +304,7 @@ console.log(`Reconcile: Adding Firestore project "${fsProject.name}" to Dexie.`)
     // 4. Load the fully reconciled projects into state
       await get().loadProjects();
       console.log("Project reconciliation complete.");
-    
+
   } catch (error) {
 console.error("Project reconciliation failed:", error);
   set({ error: (error as Error).message, isLoading: false });

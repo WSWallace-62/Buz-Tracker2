@@ -14,7 +14,7 @@ interface CustomerFormModalProps {
 export function CustomerFormModal({ isOpen, onClose, customer }: CustomerFormModalProps) {
   const { addCustomer, updateCustomer } = useCustomersStore();
   const { showToast } = useUIStore();
-  
+
   // Form state
   const [companyName, setCompanyName] = useState('');
   const [address, setAddress] = useState('');
@@ -162,12 +162,12 @@ export function CustomerFormModal({ isOpen, onClose, customer }: CustomerFormMod
   if (!isOpen) return null;
 
   return (
-    <div 
+    <div
       className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
       onClick={onClose}
       onKeyDown={handleKeyDown}
     >
-      <div 
+      <div
         className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
@@ -197,7 +197,7 @@ export function CustomerFormModal({ isOpen, onClose, customer }: CustomerFormMod
               value={companyName}
               onChange={(e) => setCompanyName(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="e.g., KJ Controls"
+              placeholder="e.g., Acme Corporation"
               autoFocus
             />
           </div>
@@ -205,7 +205,7 @@ export function CustomerFormModal({ isOpen, onClose, customer }: CustomerFormMod
           {/* Address Section */}
           <div className="space-y-4">
             <h3 className="text-lg font-medium text-gray-900 dark:text-white">Address</h3>
-            
+
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Street Address
@@ -215,7 +215,7 @@ export function CustomerFormModal({ isOpen, onClose, customer }: CustomerFormMod
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="e.g., 1983 Main Road"
+                placeholder="e.g., 123 Main Street"
               />
             </div>
 
@@ -229,7 +229,7 @@ export function CustomerFormModal({ isOpen, onClose, customer }: CustomerFormMod
                   value={city}
                   onChange={(e) => setCity(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="e.g., Nanaimo"
+                  placeholder="e.g., Springfield"
                 />
               </div>
 
@@ -242,7 +242,7 @@ export function CustomerFormModal({ isOpen, onClose, customer }: CustomerFormMod
                   value={province}
                   onChange={(e) => setProvince(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="e.g., BC"
+                  placeholder="e.g., CA"
                 />
               </div>
             </div>
@@ -257,7 +257,7 @@ export function CustomerFormModal({ isOpen, onClose, customer }: CustomerFormMod
                   value={postalCode}
                   onChange={(e) => setPostalCode(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="e.g., V9X-1T6"
+                  placeholder="e.g., 12345"
                 />
               </div>
 
@@ -305,7 +305,7 @@ export function CustomerFormModal({ isOpen, onClose, customer }: CustomerFormMod
                     value={contact.name}
                     onChange={(e) => handleContactChange(index, 'name', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="e.g., James Boileau"
+                    placeholder="e.g., John Smith"
                   />
                 </div>
 
@@ -341,7 +341,7 @@ export function CustomerFormModal({ isOpen, onClose, customer }: CustomerFormMod
           {/* Rates Section */}
           <div className="space-y-4">
             <h3 className="text-lg font-medium text-gray-900 dark:text-white">Rates</h3>
-            
+
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Currency

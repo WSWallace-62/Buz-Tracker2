@@ -1,11 +1,17 @@
 import { create } from 'zustand'
 import { db, PredefinedNote } from '../db/dexie'
 import { db as firestoreDB } from '../firebase'
-import { collection, addDoc, doc, updateDoc, deleteDoc, onSnapshot, query, Unsubscribe } from 'firebase/firestore'
+import { collection, addDoc, doc, updateDoc, deleteDoc, onSnapshot, Unsubscribe } from 'firebase/firestore'
 import { useAuthStore } from './auth'
 
 // Keep track of the unsubscribe function for predefined notes
 let unsubscribeFromPredefinedNotes: Unsubscribe | null = null;
+
+// Track recently added predefined notes to avoid duplicates from sync
+const recentlyAddedIds = new Set<string>();
+
+// Track notes being added (by content hash + timestamp) to prevent race conditions
+const notesBeingAdded = new Map<string, number>(); // key: note content, value: timestamp
 
 interface PredefinedNotesState {
   predefinedNotes: PredefinedNote[]
@@ -27,48 +33,83 @@ export const usePredefinedNotesStore = create<PredefinedNotesState>((set, get) =
   error: null,
 
   startPredefinedNotesSync: () => {
-    const user = useAuthStore.getState().user;
-    if (!user || !firestoreDB) {
-      console.log("User not logged in or firestore not available. Skipping predefined notes sync.");
-      get().loadPredefinedNotes(); // Still load local notes
-      return;
-    }
-
+    // Stop any existing listener
     if (unsubscribeFromPredefinedNotes) {
-      console.log("Predefined notes sync already active.");
+      unsubscribeFromPredefinedNotes();
+    }
+
+    const { user } = useAuthStore.getState();
+    if (!user) {
+      console.error("Cannot start predefined notes sync: User not authenticated");
       return;
     }
 
-    console.log("Starting Firestore predefined notes sync...");
-    const notesCollection = query(collection(firestoreDB, 'users', user.uid, 'predefinedNotes'));
+    if (!firestoreDB) {
+      console.error("Cannot start predefined notes sync: Firestore not initialized");
+      return;
+    }
 
+    const notesCollection = collection(firestoreDB, 'users', user.uid, 'predefinedNotes');
     unsubscribeFromPredefinedNotes = onSnapshot(notesCollection, async (snapshot) => {
+      let hasChanges = false;
+
       await db.transaction('rw', db.predefinedNotes, async () => {
         for (const change of snapshot.docChanges()) {
           const fsNote = { ...change.doc.data(), firestoreId: change.doc.id } as PredefinedNote;
           const existingNote = await db.predefinedNotes.where('firestoreId').equals(fsNote.firestoreId!).first();
 
           switch (change.type) {
-            case 'added':
+            case 'added': {
+              // Check if this note is currently being added locally
+              const noteContent = fsNote.note;
+              const isBeingAdded = notesBeingAdded.has(noteContent);
+
+              // If this was recently added locally (by ID or content), skip adding from snapshot
+              if (fsNote.firestoreId && recentlyAddedIds.has(fsNote.firestoreId)) {
+                console.log(`Skipping recently added note by ID: ${fsNote.firestoreId}`);
+                break;
+              }
+
+              if (isBeingAdded) {
+                const addedTime = notesBeingAdded.get(noteContent)!;
+                const timeSinceAdded = Date.now() - addedTime;
+                // Only skip if it was added very recently (within 10 seconds)
+                if (timeSinceAdded < 10000) {
+                  console.log(`Skipping note being added locally: "${noteContent}" (${timeSinceAdded}ms ago)`);
+                  break;
+                }
+              }
+
               if (!existingNote) {
-                 await db.predefinedNotes.add(fsNote);
+                await db.predefinedNotes.add(fsNote);
+                hasChanges = true;
+                console.log(`Added note from Firestore: ${fsNote.firestoreId}`);
               }
               break;
+            }
             case 'modified':
               if (existingNote?.id) {
                 await db.predefinedNotes.update(existingNote.id, fsNote);
+                hasChanges = true;
+                console.log(`Updated note from Firestore: ${fsNote.firestoreId}`);
               }
               break;
             case 'removed':
                if (existingNote?.id) {
                 await db.predefinedNotes.delete(existingNote.id);
+                hasChanges = true;
+                console.log(`Deleted note from Firestore: ${fsNote.firestoreId}`);
               }
               break;
           }
         }
       });
-      // After processing changes, reload all notes from Dexie to update UI
-      await get().loadPredefinedNotes();
+
+      // Only reload notes if actual changes were made to Dexie
+      if (hasChanges) {
+        console.log('Reloading predefined notes after sync changes');
+        await get().loadPredefinedNotes();
+      }
     }, (error) => {
       console.error("Error with Firestore predefined notes snapshot listener:", error);
       set({ error: "Failed to sync predefined notes." });
@@ -103,6 +144,10 @@ export const usePredefinedNotesStore = create<PredefinedNotesState>((set, get) =
     try {
       if (!firestoreDB) throw new Error("Firestore not initialized");
 
+      // Track that we're adding this note BEFORE making any async calls
+      notesBeingAdded.set(noteText, Date.now());
+      console.log(`Started adding note: "${noteText}"`);
+
       // 1. Save to Firestore to get the firestoreId
       const notesCol = collection(firestoreDB, 'users', user.uid, 'predefinedNotes');
       const newNoteFsData = {
@@ -111,18 +156,33 @@ export const usePredefinedNotesStore = create<PredefinedNotesState>((set, get) =
       }
       const docRef = await addDoc(notesCol, newNoteFsData);
 
-      // 2. Save to Dexie with the new firestoreId
+      console.log(`Added note to Firestore with ID: ${docRef.id}`);
+
+      // Track this ID IMMEDIATELY to prevent duplicate from sync listener
+      recentlyAddedIds.add(docRef.id);
+      console.log(`Tracking note ID to prevent duplicates: ${docRef.id}`);
+
+      // 2. Save to Dexie with the new firestoreId for instant UI feedback
       const newNote: PredefinedNote = {
         ...newNoteFsData,
         firestoreId: docRef.id
       }
-      const id = await db.predefinedNotes.add(newNote)
-      const noteWithId = { ...newNote, id: id as number }
+      const dexieId = await db.predefinedNotes.add(newNote);
+      console.log(`Added note to Dexie with local ID: ${dexieId}, Firestore ID: ${docRef.id}`);
 
-      set(state => ({
-        predefinedNotes: [...state.predefinedNotes, noteWithId]
-      }))
+      // 3. Reload notes from Dexie to update UI
+      await get().loadPredefinedNotes();
+
+      // Clean up the tracking sets after a delay to ensure sync listener has processed
+      setTimeout(() => {
+        recentlyAddedIds.delete(docRef.id);
+        notesBeingAdded.delete(noteText);
+        console.log(`Removed tracking for note ID: ${docRef.id}`);
+      }, 10000); // Increased to 10 seconds to match the sync check
     } catch (error) {
+      console.error('Error adding predefined note:', error);
+      // Clean up tracking on error
+      notesBeingAdded.delete(noteText);
       set({ error: (error as Error).message })
     }
   },

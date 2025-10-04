@@ -302,7 +302,7 @@ export function HistoryPanel() {
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 no-print">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white">History & Analytics</h2>
-          <span aria-hidden="true" className="text-sm font-medium text-gray-500 dark:text-gray-400">Rev 2.1</span>
+          <span aria-hidden="true" className="text-sm font-medium text-gray-500 dark:text-gray-400">Rev 2.2</span>
         </div>
 
         <div className="grid grid-cols-2 gap-2 md:gap-4 mb-4">

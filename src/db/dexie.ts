@@ -28,7 +28,8 @@ export interface Project {
   color: string
   createdAt: number
   archived: boolean
-  customerId?: number
+  customerId?: number  // Deprecated: kept for backward compatibility
+  customerFirestoreId?: string  // New: stores the Firestore ID of the customer
   firestoreId?: string;
 }
 
@@ -86,7 +87,32 @@ export class BuzTrackerDB extends Dexie {
   constructor() {
     super('BuzTrackerDB')
 
-    // Bump DB version to 613 to add customers table
+    // Bump DB version to 614 to add customerFirestoreId to projects
+    this.version(614).stores({
+      projects: '++id, firestoreId, name, createdAt, archived, customerId, customerFirestoreId',
+      sessions: '++id, projectId, firestoreId, start, stop, createdAt, *note',
+      settings: '++id',
+      runningSession: '++id, running, projectId, startTs, isPaused, continuedFromSessionId',
+      predefinedNotes: '++id, firestoreId, note, createdAt',
+      customers: '++id, firestoreId, companyName, createdAt, archived'
+    }).upgrade(async (trans) => {
+      // Migration: For existing projects with customerId, populate customerFirestoreId
+      const projects = await trans.table('projects').toArray();
+      const customers = await trans.table('customers').toArray();
+
+      for (const project of projects) {
+        if (project.customerId && !project.customerFirestoreId) {
+          const customer = customers.find(c => c.id === project.customerId);
+          if (customer?.firestoreId) {
+            await trans.table('projects').update(project.id, {
+              customerFirestoreId: customer.firestoreId
+            });
+          }
+        }
+      }
+    });
+
+    // Keep version 613 for backward compatibility
     this.version(613).stores({
       projects: '++id, firestoreId, name, createdAt, archived, customerId',
       sessions: '++id, projectId, firestoreId, start, stop, createdAt, *note',
@@ -146,7 +172,8 @@ export class BuzTrackerDB extends Dexie {
           color: '#3b82f6',
           createdAt: Date.now(),
           archived: false,
-          customerId: kjControls?.id
+          customerId: kjControls?.id,
+          customerFirestoreId: kjControls?.firestoreId
         });
       } else {
         // Migration: Link "Parksville Water System" to KJ Controls if it exists
@@ -154,7 +181,10 @@ export class BuzTrackerDB extends Dexie {
         const kjControls = await this.customers.where('companyName').equals('KJ Controls').first();
 
         if (parksvilleProject && kjControls && !parksvilleProject.customerId) {
-          await this.projects.update(parksvilleProject.id!, { customerId: kjControls.id });
+          await this.projects.update(parksvilleProject.id!, {
+            customerId: kjControls.id,
+            customerFirestoreId: kjControls.firestoreId
+          });
           console.log('Linked Parksville Water System to KJ Controls');
         }
       }
