@@ -59,7 +59,7 @@ export const usePredefinedNotesStore = create<PredefinedNotesState>((set, get) =
           const existingNote = await db.predefinedNotes.where('firestoreId').equals(fsNote.firestoreId!).first();
 
           switch (change.type) {
-            case 'added':
+            case 'added': {
               // Check if this note is currently being added locally
               const noteContent = fsNote.note;
               const isBeingAdded = notesBeingAdded.has(noteContent);
@@ -86,6 +86,7 @@ export const usePredefinedNotesStore = create<PredefinedNotesState>((set, get) =
                 console.log(`Added note from Firestore: ${fsNote.firestoreId}`);
               }
               break;
+            }
             case 'modified':
               if (existingNote?.id) {
                 await db.predefinedNotes.update(existingNote.id, fsNote);
