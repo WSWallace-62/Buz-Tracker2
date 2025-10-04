@@ -65,12 +65,21 @@ function AppContent() {
     }
   }, [theme]);
 
-  // Load theme from database on mount
+  // Load theme from localStorage first, then database
   useEffect(() => {
     const loadTheme = async () => {
-      const settings = await db.settings.toCollection().first();
-      if (settings?.theme) {
-        setTheme(settings.theme);
+      // Check localStorage first (persists across logins)
+      const savedTheme = localStorage.getItem('buztracker-theme') as 'light' | 'dark' | null;
+      if (savedTheme) {
+        setTheme(savedTheme);
+      } else {
+        // Fallback to database
+        const settings = await db.settings.toCollection().first();
+        if (settings?.theme) {
+          setTheme(settings.theme);
+          // Save to localStorage for future
+          localStorage.setItem('buztracker-theme', settings.theme);
+        }
       }
     };
     loadTheme();

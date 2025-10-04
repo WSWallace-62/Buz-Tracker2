@@ -42,14 +42,14 @@ export const useUIStore = create<UIState>((set, get) => ({
   confirmDialog: null,
   toasts: [],
   currentProjectId: null,
-  theme: 'light',
-  
+  theme: (localStorage.getItem('buztracker-theme') as 'light' | 'dark') || 'light',
+
   openProjectManager: () => set({ isProjectManagerOpen: true }),
   closeProjectManager: () => set({ isProjectManagerOpen: false }),
-  
+
   openAddEntryModal: () => set({ isAddEntryModalOpen: true }),
   closeAddEntryModal: () => set({ isAddEntryModalOpen: false }),
-  
+
   showConfirm: (title, message, onConfirm, onCancel) => {
     set({
       confirmDialog: {
@@ -61,30 +61,30 @@ export const useUIStore = create<UIState>((set, get) => ({
       }
     })
   },
-  
+
   hideConfirm: () => set({ confirmDialog: null }),
-  
+
   showToast: (message, type = 'info', action) => {
     const id = Math.random().toString(36).substr(2, 9);
     const toast: ToastState = { id, message, type, action };
-    
+
     set(state => ({
       toasts: [...state.toasts, toast]
     }));
-    
+
     if (!action) {
       setTimeout(() => {
         get().removeToast(id);
       }, 5000);
     }
   },
-  
+
   removeToast: (id) => {
     set(state => ({
       toasts: state.toasts.filter(t => t.id !== id)
     }));
   },
-  
+
   // FIX: Added the parameter types back
   setCurrentProject: (projectId: number | null) => {
     set({ currentProjectId: projectId });
@@ -96,10 +96,13 @@ export const useUIStore = create<UIState>((set, get) => ({
       });
     }
   },
-  
+
   // FIX: Added the parameter types back
   setTheme: (theme: 'light' | 'dark') => {
     set({ theme });
+    // Save to localStorage for persistence across logins/logouts
+    localStorage.setItem('buztracker-theme', theme);
+    // Also save to database for sync
     db.settings.toCollection().first().then(settings => {
       if (settings) {
         db.settings.update(settings.id!, { theme });

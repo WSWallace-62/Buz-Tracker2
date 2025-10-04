@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { db, PredefinedNote } from '../db/dexie'
 import { db as firestoreDB } from '../firebase'
-import { collection, addDoc, doc, updateDoc, deleteDoc, onSnapshot, query, Unsubscribe } from 'firebase/firestore'
+import { collection, addDoc, doc, updateDoc, deleteDoc, onSnapshot, Unsubscribe } from 'firebase/firestore'
 import { useAuthStore } from './auth'
 
 // Keep track of the unsubscribe function for predefined notes
