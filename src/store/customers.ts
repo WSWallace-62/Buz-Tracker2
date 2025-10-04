@@ -7,11 +7,14 @@ import { useAuthStore } from './auth';
 // Keep track of the unsubscribe function for customers
 let unsubscribeFromCustomers: Unsubscribe | null = null;
 
+// Track recently added firestoreIds to prevent duplicates from sync listener
+const recentlyAddedIds = new Set<string>();
+
 interface CustomersState {
   customers: Customer[];
   isLoading: boolean;
   error: string | null;
-  
+
   // Actions
   loadCustomers: () => Promise<void>;
   addCustomer: (customer: Omit<Customer, 'id' | 'createdAt'>) => Promise<void>;
@@ -39,7 +42,7 @@ export const useCustomersStore = create<CustomersState>((set, get) => ({
       console.log("Customer sync already active.");
       return;
     }
-    
+
     console.log("Starting Firestore customer sync...");
     const customersCollection = query(collection(firestoreDB, 'users', user.uid, 'customers'));
 
@@ -48,9 +51,14 @@ export const useCustomersStore = create<CustomersState>((set, get) => ({
         for (const change of snapshot.docChanges()) {
           const fsCustomer = { ...change.doc.data(), firestoreId: change.doc.id } as Customer;
           const existingCustomer = await db.customers.where('firestoreId').equals(fsCustomer.firestoreId!).first();
-          
+
           switch (change.type) {
             case 'added':
+              // If this was recently added locally, skip adding from snapshot to avoid duplicates.
+              if (fsCustomer.firestoreId && recentlyAddedIds.has(fsCustomer.firestoreId)) {
+                // Skip adding - the timeout in addCustomer will clean up the tracking set
+                break;
+              }
               if (!existingCustomer) {
                 await db.customers.add(fsCustomer);
               }
@@ -87,8 +95,26 @@ export const useCustomersStore = create<CustomersState>((set, get) => ({
   loadCustomers: async () => {
     set({ isLoading: true, error: null });
     try {
-      const customers = await db.customers.orderBy('createdAt').toArray();
-      set({ customers, isLoading: false });
+      const allCustomers = await db.customers.orderBy('createdAt').toArray();
+
+      // Remove duplicates based on firestoreId
+      // Keep the first occurrence of each firestoreId
+      const seenFirestoreIds = new Set<string>();
+      const uniqueCustomers = allCustomers.filter(customer => {
+        if (customer.firestoreId) {
+          if (seenFirestoreIds.has(customer.firestoreId)) {
+            // This is a duplicate - delete it from Dexie
+            db.customers.delete(customer.id!).catch(err =>
+              console.error('Error deleting duplicate customer:', err)
+            );
+            return false; // Don't include in the result
+          }
+          seenFirestoreIds.add(customer.firestoreId);
+        }
+        return true;
+      });
+
+      set({ customers: uniqueCustomers, isLoading: false });
     } catch (error) {
       set({ error: (error as Error).message, isLoading: false });
     }
@@ -113,19 +139,29 @@ export const useCustomersStore = create<CustomersState>((set, get) => ({
           collection(firestoreDB, 'users', user.uid, 'customers'),
           newCustomer
         );
-        
-        // Add to Dexie with firestoreId
+
+        // Track this firestoreId IMMEDIATELY so the sync listener doesn't add a duplicate
+        recentlyAddedIds.add(docRef.id);
+
+        // Also add to Dexie immediately for instant UI feedback
         await db.customers.add({
           ...newCustomer,
           firestoreId: docRef.id
         });
+
+        // Reload customers to update UI
+        await get().loadCustomers();
+
+        // Clean up the tracking set after a delay to ensure sync listener has processed
+        setTimeout(() => {
+          recentlyAddedIds.delete(docRef.id);
+        }, 5000); // 5 seconds should be more than enough
       } else {
         // If no Firestore, just add to Dexie
         await db.customers.add(newCustomer);
+        // Reload customers only in guest mode
+        await get().loadCustomers();
       }
-
-      // Reload customers
-      await get().loadCustomers();
     } catch (error) {
       set({ error: (error as Error).message });
     }
@@ -148,13 +184,16 @@ export const useCustomersStore = create<CustomersState>((set, get) => ({
       if (customer.firestoreId && firestoreDB) {
         const customerRef = doc(firestoreDB, 'users', user.uid, 'customers', customer.firestoreId);
         await updateDoc(customerRef, updates);
+        // Also update Dexie immediately for instant UI feedback
+        await db.customers.update(id, updates);
+        // Reload customers to update UI
+        await get().loadCustomers();
+      } else {
+        // If no Firestore, update Dexie directly
+        await db.customers.update(id, updates);
+        // Reload customers only in guest mode
+        await get().loadCustomers();
       }
-
-      // Update in Dexie
-      await db.customers.update(id, updates);
-
-      // Reload customers
-      await get().loadCustomers();
     } catch (error) {
       set({ error: (error as Error).message });
     }
@@ -177,13 +216,16 @@ export const useCustomersStore = create<CustomersState>((set, get) => ({
       if (customer.firestoreId && firestoreDB) {
         const customerRef = doc(firestoreDB, 'users', user.uid, 'customers', customer.firestoreId);
         await deleteDoc(customerRef);
+        // Also delete from Dexie immediately for instant UI feedback
+        await db.customers.delete(id);
+        // Reload customers to update UI
+        await get().loadCustomers();
+      } else {
+        // If no Firestore, delete from Dexie directly
+        await db.customers.delete(id);
+        // Reload customers only in guest mode
+        await get().loadCustomers();
       }
-
-      // Delete from Dexie
-      await db.customers.delete(id);
-
-      // Reload customers
-      await get().loadCustomers();
     } catch (error) {
       set({ error: (error as Error).message });
     }
