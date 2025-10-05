@@ -6,6 +6,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db as dexieDB } from '../db/dexie';
 import { useSessionsStore } from '../store/sessions';
 import { useProjectsStore } from '../store/projects';
+import { useCustomersStore } from '../store/customers';
 import { useUIStore } from '../store/ui';
 import { getDateRanges, formatDurationHours, formatDate } from '../utils/time';
 import { SessionsTable } from './SessionsTable';
@@ -37,6 +38,7 @@ type GroupBy = 'day' | 'project';
 export function HistoryPanel() {
   const { getTotalDuration } = useSessionsStore();
   const { projects } = useProjectsStore();
+  const { customers } = useCustomersStore();
   const { theme } = useUIStore();
   const windowWidth = useWindowWidth();
 
@@ -89,6 +91,25 @@ export function HistoryPanel() {
 
     let filtered = sessions;
 
+    // Filter out sessions from archived projects and archived customers
+    filtered = filtered.filter(s => {
+      const project = projects.find(p => p.id === s.projectId);
+
+      // Filter out archived projects
+      if (project?.archived) return false;
+
+      // Filter out projects from archived customers
+      if (project?.customerFirestoreId) {
+        const customer = customers.find(c => c.firestoreId === project.customerFirestoreId);
+        if (customer?.archived) return false;
+      } else if (project?.customerId) {
+        const customer = customers.find(c => c.id === project.customerId);
+        if (customer?.archived) return false;
+      }
+
+      return true;
+    });
+
     if (selectedProjectIds.length > 0) {
       filtered = filtered.filter(s => selectedProjectIds.includes(s.projectId));
     }
@@ -113,7 +134,7 @@ export function HistoryPanel() {
     });
 
     return filtered;
-  }, [sessions, selectedProjectIds, noteFilter, sortOrder]);
+  }, [sessions, selectedProjectIds, noteFilter, sortOrder, projects, customers]);
 
   const summaryData = useMemo(() => {
     const totalMs = getTotalDuration(filteredSessions);
@@ -302,7 +323,7 @@ export function HistoryPanel() {
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 no-print">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white">History & Analytics</h2>
-          <span aria-hidden="true" className="text-sm font-medium text-gray-500 dark:text-gray-400">Rev 2.2</span>
+          <span aria-hidden="true" className="text-sm font-medium text-gray-500 dark:text-gray-400">Rev 2.3</span>
         </div>
 
         <div className="grid grid-cols-2 gap-2 md:gap-4 mb-4">
@@ -433,7 +454,21 @@ export function HistoryPanel() {
             >
               All Projects
             </button>
-            {projects.filter(p => !p.archived).map(project => (
+            {projects.filter(p => {
+              // Filter out archived projects
+              if (p.archived) return false;
+
+              // Filter out projects from archived customers
+              if (p.customerFirestoreId) {
+                const customer = customers.find(c => c.firestoreId === p.customerFirestoreId);
+                if (customer?.archived) return false;
+              } else if (p.customerId) {
+                const customer = customers.find(c => c.id === p.customerId);
+                if (customer?.archived) return false;
+              }
+
+              return true;
+            }).map(project => (
               <button
                 key={project.id}
                 onClick={() => handleProjectToggle(project.id!)}

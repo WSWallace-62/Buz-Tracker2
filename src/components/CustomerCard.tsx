@@ -35,14 +35,27 @@ export function CustomerCard({ customer, onEdit }: CustomerCardProps) {
 
   const handleArchive = () => {
     const action = customer.archived ? 'unarchive' : 'archive';
-    showConfirm(
-      `${action.charAt(0).toUpperCase() + action.slice(1)} Customer`,
-      `Are you sure you want to ${action} ${customer.companyName}?`,
-      async () => {
-        await archiveCustomer(customer.id!, !customer.archived);
-        showToast(`Customer ${action}d successfully`, 'success');
-      }
-    );
+
+    // If archiving and has projects, show warning
+    if (!customer.archived && projectCount > 0) {
+      showConfirm(
+        'Archive Customer',
+        `Archiving this customer will also make all ${projectCount} linked ${projectCount === 1 ? 'project' : 'projects'} inactive. Continue?`,
+        async () => {
+          await archiveCustomer(customer.id!, !customer.archived);
+          showToast(`Customer ${action}d successfully`, 'success');
+        }
+      );
+    } else {
+      showConfirm(
+        `${action.charAt(0).toUpperCase() + action.slice(1)} Customer`,
+        `Are you sure you want to ${action} ${customer.companyName}?`,
+        async () => {
+          await archiveCustomer(customer.id!, !customer.archived);
+          showToast(`Customer ${action}d successfully`, 'success');
+        }
+      );
+    }
   };
 
   const handleDelete = () => {
@@ -84,15 +97,17 @@ export function CustomerCard({ customer, onEdit }: CustomerCardProps) {
 
           {/* Action Buttons */}
           <div className="flex gap-2">
-            <button
-              onClick={() => onEdit(customer)}
-              className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-colors"
-              title="Edit customer"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-              </svg>
-            </button>
+            {!customer.archived && (
+              <button
+                onClick={() => onEdit(customer)}
+                className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-colors"
+                title="Edit customer"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+              </button>
+            )}
 
             <button
               onClick={handleArchive}
@@ -104,16 +119,17 @@ export function CustomerCard({ customer, onEdit }: CustomerCardProps) {
               </svg>
             </button>
 
-            <button
-              onClick={handleDelete}
-              className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors"
-              title="Delete customer"
-              disabled={projectCount > 0}
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-            </button>
+            {projectCount === 0 && !customer.archived && (
+              <button
+                onClick={handleDelete}
+                className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors"
+                title="Delete customer"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+            )}
           </div>
         </div>
 
@@ -185,7 +201,7 @@ export function CustomerCard({ customer, onEdit }: CustomerCardProps) {
                   <div key={index} className="text-sm text-gray-600 dark:text-gray-400">
                     <div className="font-medium">{contact.name}</div>
                     {contact.email && (
-                      <a 
+                      <a
                         href={`mailto:${contact.email}`}
                         className="text-blue-600 dark:text-blue-400 hover:underline"
                       >
@@ -202,6 +218,8 @@ export function CustomerCard({ customer, onEdit }: CustomerCardProps) {
                 <CustomerProjectManager
                   customerFirestoreId={customer.firestoreId}
                   customerId={customer.id!}
+                  customerName={customer.companyName}
+                  customerArchived={customer.archived || false}
                   projects={projects || []}
                 />
               </div>

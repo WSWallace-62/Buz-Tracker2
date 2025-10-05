@@ -1,4 +1,4 @@
-// src/App.tsx
+ // src/App.tsx
 import { useEffect, useState, lazy, Suspense, useCallback, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
@@ -26,12 +26,13 @@ const HistoryPanel = lazy(() => import('./components/HistoryPanel').then(module 
 const SettingsPage = lazy(() => import('./pages/SettingsPage').then(module => ({ default: module.SettingsPage })));
 const ProfilePage = lazy(() => import('./pages/ProfilePage').then(module => ({ default: module.ProfilePage })));
 const CustomersPage = lazy(() => import('./pages/CustomersPage'));
+const FAQPage = lazy(() => import('./pages/FAQPage').then(module => ({ default: module.FAQPage })));
 const Auth = lazy(() => import('./components/Auth').then(module => ({ default: module.Auth })));
 const AddEntryModal = lazy(() => import('./components/AddEntryModal').then(module => ({ default: module.AddEntryModal })));
 const ProjectManagerModal = lazy(() => import('./components/ProjectManagerModal').then(module => ({ default: module.ProjectManagerModal })));
 const ConfirmDialog = lazy(() => import('./components/ConfirmDialog').then(module => ({ default: module.ConfirmDialog })));
 
-type Tab = 'tracker' | 'history' | 'settings' | 'profile' | 'customers';
+type Tab = 'tracker' | 'history' | 'settings' | 'profile' | 'customers' | 'faq';
 
 export function App() {
   return (
@@ -52,7 +53,7 @@ function AppContent() {
   const [isGuest, setIsGuest] = useState(false);
   const location = useLocation();
 
-  const activeTab: Tab = location.pathname === '/history' ? 'history' : location.pathname === '/settings' ? 'settings' : location.pathname === '/profile' ? 'profile' : location.pathname === '/customers' ? 'customers' : 'tracker';
+  const activeTab: Tab = location.pathname === '/history' ? 'history' : location.pathname === '/settings' ? 'settings' : location.pathname === '/profile' ? 'profile' : location.pathname === '/customers' ? 'customers' : location.pathname === '/faq' ? 'faq' : 'tracker';
 
   const { runningSession, getCurrentElapsed, loadSessions, loadRunningSession } = useSessionsStore();
 
@@ -138,7 +139,7 @@ function AppContent() {
       document.title = defaultTitle;
     }
   }, [runningSession, getCurrentElapsed]);
-  
+
   const audioRef = useRef<HTMLAudioElement>(null);
   useEffect(() => {
     if (audioRef.current) {
@@ -284,6 +285,7 @@ function AppContent() {
             <Route path="/history" element={<HistoryPanel />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/faq" element={<FAQPage />} />
           </Routes>
         </Suspense>
       </main>

@@ -1,17 +1,30 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { useUIStore } from '../store/ui'
 
 export function ConfirmDialog() {
   const { confirmDialog, hideConfirm } = useUIStore()
   const confirmButtonRef = useRef<HTMLButtonElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [inputValue, setInputValue] = useState('')
 
   useEffect(() => {
-    if (confirmDialog?.isOpen && confirmButtonRef.current) {
-      confirmButtonRef.current.focus()
+    if (confirmDialog?.isOpen) {
+      // Reset input value when dialog opens
+      setInputValue('')
+
+      // Focus on input if requireText is set, otherwise focus on confirm button
+      if (confirmDialog.requireText && inputRef.current) {
+        inputRef.current.focus()
+      } else if (confirmButtonRef.current) {
+        confirmButtonRef.current.focus()
+      }
     }
-  }, [confirmDialog?.isOpen])
+  }, [confirmDialog?.isOpen, confirmDialog?.requireText])
+
+  const isConfirmDisabled = !!(confirmDialog?.requireText && inputValue !== confirmDialog.requireText)
 
   const handleConfirm = () => {
+    if (isConfirmDisabled) return
     confirmDialog?.onConfirm()
     hideConfirm()
   }
@@ -24,7 +37,7 @@ export function ConfirmDialog() {
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
       handleCancel()
-    } else if (e.key === 'Enter') {
+    } else if (e.key === 'Enter' && !isConfirmDisabled) {
       handleConfirm()
     }
   }
@@ -64,9 +77,30 @@ export function ConfirmDialog() {
           </h3>
         </div>
 
-        <p id="confirm-message" className="text-gray-600 dark:text-gray-300 mb-6">
+        <p id="confirm-message" className="text-gray-600 dark:text-gray-300 mb-6 whitespace-pre-line">
           {confirmDialog.message}
         </p>
+
+        {confirmDialog.requireText && (
+          <div className="mb-6">
+            <label
+              htmlFor="confirm-input"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+            >
+              Type <span className="font-semibold text-red-600 dark:text-red-400">{confirmDialog.requireText}</span> to confirm:
+            </label>
+            <input
+              ref={inputRef}
+              id="confirm-input"
+              type="text"
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-500 dark:focus:ring-red-400"
+              placeholder={confirmDialog.requireText}
+              autoComplete="off"
+            />
+          </div>
+        )}
 
         <div className="flex justify-end space-x-3">
           <button
@@ -78,7 +112,12 @@ export function ConfirmDialog() {
           <button
             ref={confirmButtonRef}
             onClick={handleConfirm}
-            className="px-4 py-2 bg-red-600 dark:bg-red-600 text-white rounded-md hover:bg-red-700 dark:hover:bg-red-500 focus:outline-none focus:ring-2 focus:ring-red-500 dark:focus:ring-red-400 transition-colors"
+            disabled={isConfirmDisabled}
+            className={`px-4 py-2 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 dark:focus:ring-red-400 transition-colors ${
+              isConfirmDisabled
+                ? 'bg-gray-400 dark:bg-gray-600 cursor-not-allowed'
+                : 'bg-red-600 dark:bg-red-600 hover:bg-red-700 dark:hover:bg-red-500'
+            }`}
           >
             Confirm
           </button>

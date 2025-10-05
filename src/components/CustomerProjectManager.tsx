@@ -12,10 +12,12 @@ const COLORS = [
 interface CustomerProjectManagerProps {
   customerFirestoreId: string;
   customerId: number;
+  customerName: string;  // Add customer name for better context in dialogs
+  customerArchived: boolean;  // Add customer archived state
   projects: Project[];
 }
 
-export function CustomerProjectManager({ customerFirestoreId, customerId, projects }: CustomerProjectManagerProps) {
+export function CustomerProjectManager({ customerFirestoreId, customerId, customerName, customerArchived, projects }: CustomerProjectManagerProps) {
   const { createProject, updateProject, deleteProject, archiveProject } = useProjectsStore();
   const { showConfirm, showToast } = useUIStore();
   const [isCreating, setIsCreating] = useState(false);
@@ -27,6 +29,12 @@ export function CustomerProjectManager({ customerFirestoreId, customerId, projec
 
     if (!formData.name.trim()) {
       showToast('Project name is required', 'error');
+      return;
+    }
+
+    // Prevent creating a new project for an archived customer
+    if (!editingProject && customerArchived) {
+      showToast('Cannot create project for archived customer', 'error');
       return;
     }
 
@@ -65,19 +73,26 @@ export function CustomerProjectManager({ customerFirestoreId, customerId, projec
   };
 
   const handleCreate = () => {
+    if (customerArchived) {
+      showToast(`${customerName} is archived. Cannot create projects.`, 'error');
+      return;
+    }
     setIsCreating(true);
     setEditingProject(null);
     setFormData({ name: '', color: COLORS[0] });
   };
 
   const handleDelete = (project: Project) => {
+    const confirmText = `Delete-${project.name}`;
     showConfirm(
       'Delete Project',
-      `Are you sure you want to delete "${project.name}"? This will also delete all associated time sessions.`,
+      `Are you sure you want to delete "${project.name}" from ${customerName}?\n\nThis will also delete all associated time sessions.\n\nThis action cannot be undone.`,
       async () => {
         await deleteProject(project.id!);
         showToast('Project deleted', 'success');
-      }
+      },
+      undefined,
+      confirmText
     );
   };
 
@@ -106,7 +121,7 @@ export function CustomerProjectManager({ customerFirestoreId, customerId, projec
     <div>
       <div className="flex justify-between items-center mb-3">
         <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">Projects</h4>
-        {!isCreating && !editingProject && (
+        {!isCreating && !editingProject && !customerArchived && (
           <button
             onClick={handleCreate}
             className="px-3 py-1 bg-blue-600 text-white text-xs rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
@@ -195,40 +210,42 @@ export function CustomerProjectManager({ customerFirestoreId, customerId, projec
                 <span className="text-sm text-gray-900 dark:text-white">{project.name}</span>
               </div>
 
-              <div className="flex space-x-1">
-                <button
-                  onClick={() => handleEdit(project)}
-                  className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors p-1"
-                  aria-label="Edit project"
-                  title="Edit project"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                  </svg>
-                </button>
+              {!customerArchived && (
+                <div className="flex space-x-1">
+                  <button
+                    onClick={() => handleEdit(project)}
+                    className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors p-1"
+                    aria-label="Edit project"
+                    title="Edit project"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                  </button>
 
-                <button
-                  onClick={() => handleArchive(project)}
-                  className="text-orange-600 dark:text-orange-400 hover:text-orange-800 dark:hover:text-orange-300 transition-colors p-1"
-                  aria-label="Archive project"
-                  title="Archive project"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-                  </svg>
-                </button>
+                  <button
+                    onClick={() => handleArchive(project)}
+                    className="text-orange-600 dark:text-orange-400 hover:text-orange-800 dark:hover:text-orange-300 transition-colors p-1"
+                    aria-label="Archive project"
+                    title="Archive project"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                    </svg>
+                  </button>
 
-                <button
-                  onClick={() => handleDelete(project)}
-                  className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 transition-colors p-1"
-                  aria-label="Delete project"
-                  title="Delete project"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                </button>
-              </div>
+                  <button
+                    onClick={() => handleDelete(project)}
+                    className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 transition-colors p-1"
+                    aria-label="Delete project"
+                    title="Delete project"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -255,40 +272,42 @@ export function CustomerProjectManager({ customerFirestoreId, customerId, projec
                   </span>
                 </div>
 
-                <div className="flex space-x-1">
-                  <button
-                    onClick={() => handleEdit(project)}
-                    className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors p-1"
-                    aria-label="Edit project"
-                    title="Edit project"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
-                  </button>
+                {!customerArchived && (
+                  <div className="flex space-x-1">
+                    <button
+                      onClick={() => handleEdit(project)}
+                      className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors p-1"
+                      aria-label="Edit project"
+                      title="Edit project"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                    </button>
 
-                  <button
-                    onClick={() => handleArchive(project)}
-                    className="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 transition-colors p-1"
-                    aria-label="Unarchive project"
-                    title="Unarchive project"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16l-4-4m0 0l4-4m-4 4h18" />
-                    </svg>
-                  </button>
+                    <button
+                      onClick={() => handleArchive(project)}
+                      className="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 transition-colors p-1"
+                      aria-label="Unarchive project"
+                      title="Unarchive project"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16l-4-4m0 0l4-4m-4 4h18" />
+                      </svg>
+                    </button>
 
-                  <button
-                    onClick={() => handleDelete(project)}
-                    className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 transition-colors p-1"
-                    aria-label="Delete project"
-                    title="Delete project"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </button>
-                </div>
+                    <button
+                      onClick={() => handleDelete(project)}
+                      className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 transition-colors p-1"
+                      aria-label="Delete project"
+                      title="Delete project"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -298,7 +317,7 @@ export function CustomerProjectManager({ customerFirestoreId, customerId, projec
       {/* Empty State */}
       {activeProjects.length === 0 && archivedProjects.length === 0 && !isCreating && !editingProject && (
         <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
-          No projects yet. Click "Add Project" to create one.
+          {customerArchived ? `${customerName} is archived. No projects can be created.` : 'No projects yet. Click "Add Project" to create one.'}
         </p>
       )}
     </div>

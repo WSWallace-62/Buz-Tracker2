@@ -15,14 +15,12 @@ export function CustomersPage() {
     loadCustomers();
   }, [loadCustomers]);
 
-  // Filter customers
-  const filteredCustomers = customers.filter(customer => {
-    // Filter by archived status
-    if (!showArchived && customer.archived) {
-      return false;
-    }
+  // Split customers by archived status
+  const activeCustomers = customers.filter(customer => !customer.archived);
+  const archivedCustomers = customers.filter(customer => customer.archived);
 
-    // Filter by search query
+  // Apply search filter to active customers
+  const filteredActiveCustomers = activeCustomers.filter(customer => {
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       return (
@@ -32,7 +30,20 @@ export function CustomersPage() {
         customer.contacts.some(c => c.name.toLowerCase().includes(query))
       );
     }
+    return true;
+  });
 
+  // Apply search filter to archived customers
+  const filteredArchivedCustomers = archivedCustomers.filter(customer => {
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      return (
+        customer.companyName.toLowerCase().includes(query) ||
+        customer.city.toLowerCase().includes(query) ||
+        customer.province.toLowerCase().includes(query) ||
+        customer.contacts.some(c => c.name.toLowerCase().includes(query))
+      );
+    }
     return true;
   });
 
@@ -92,21 +103,34 @@ export function CustomersPage() {
         </div>
 
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <svg className="w-8 h-8 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-              </svg>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <svg className="w-8 h-8 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                </svg>
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Archived Customers</p>
+                <p className="text-2xl font-semibold text-gray-900 dark:text-white">{archivedCustomersCount}</p>
+              </div>
             </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Archived Customers</p>
-              <p className="text-2xl font-semibold text-gray-900 dark:text-white">{archivedCustomersCount}</p>
-            </div>
+            {archivedCustomersCount > 0 && (
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={showArchived}
+                  onChange={(e) => setShowArchived(e.target.checked)}
+                  className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600 cursor-pointer"
+                />
+                <span className="text-sm font-medium text-gray-900 dark:text-white">Show Archived</span>
+              </label>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Search and Filters */}
+      {/* Search */}
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="flex-1">
           <div className="relative">
@@ -117,26 +141,16 @@ export function CustomersPage() {
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
-            <svg 
+            <svg
               className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400"
-              fill="none" 
-              stroke="currentColor" 
+              fill="none"
+              stroke="currentColor"
               viewBox="0 0 24 24"
             >
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
           </div>
         </div>
-
-        <label className="flex items-center space-x-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={showArchived}
-            onChange={(e) => setShowArchived(e.target.checked)}
-            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-          />
-          <span className="text-sm text-gray-700 dark:text-gray-300">Show Archived</span>
-        </label>
       </div>
 
       {/* Loading State */}
@@ -147,12 +161,12 @@ export function CustomersPage() {
       )}
 
       {/* Empty State */}
-      {!isLoading && filteredCustomers.length === 0 && !searchQuery && (
+      {!isLoading && activeCustomers.length === 0 && archivedCustomers.length === 0 && (
         <div className="text-center py-12">
-          <svg 
+          <svg
             className="mx-auto h-12 w-12 text-gray-400"
-            fill="none" 
-            stroke="currentColor" 
+            fill="none"
+            stroke="currentColor"
             viewBox="0 0 24 24"
           >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
@@ -176,12 +190,12 @@ export function CustomersPage() {
       )}
 
       {/* No Search Results */}
-      {!isLoading && filteredCustomers.length === 0 && searchQuery && (
+      {!isLoading && filteredActiveCustomers.length === 0 && filteredArchivedCustomers.length === 0 && searchQuery && (
         <div className="text-center py-12">
-          <svg 
+          <svg
             className="mx-auto h-12 w-12 text-gray-400"
-            fill="none" 
-            stroke="currentColor" 
+            fill="none"
+            stroke="currentColor"
             viewBox="0 0 24 24"
           >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -193,16 +207,44 @@ export function CustomersPage() {
         </div>
       )}
 
-      {/* Customer Cards Grid */}
-      {!isLoading && filteredCustomers.length > 0 && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {filteredCustomers.map((customer) => (
-            <CustomerCard
-              key={customer.id}
-              customer={customer}
-              onEdit={handleEditCustomer}
-            />
-          ))}
+      {/* Active Customers Section */}
+      {!isLoading && filteredActiveCustomers.length > 0 && (
+        <div className="space-y-4">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Active Customers</h2>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {filteredActiveCustomers.map((customer) => (
+              <CustomerCard
+                key={customer.id}
+                customer={customer}
+                onEdit={handleEditCustomer}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Archived Customers Section */}
+      {!isLoading && archivedCustomers.length > 0 && showArchived && (
+        <div className="space-y-4 mt-8">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Archived Customers</h2>
+
+          {filteredArchivedCustomers.length > 0 && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {filteredArchivedCustomers.map((customer) => (
+                <CustomerCard
+                  key={customer.id}
+                  customer={customer}
+                  onEdit={handleEditCustomer}
+                />
+              ))}
+            </div>
+          )}
+
+          {filteredArchivedCustomers.length === 0 && searchQuery && (
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+              No archived customers match your search.
+            </div>
+          )}
         </div>
       )}
 

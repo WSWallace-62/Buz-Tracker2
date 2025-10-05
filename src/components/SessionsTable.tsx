@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useSessionsStore } from '../store/sessions'
 import { useProjectsStore } from '../store/projects'
 import { useUIStore } from '../store/ui'
+import { useCustomersStore } from '../store/customers'
 import { formatTime, formatDurationHHMM, isToday, formatDate, parseDurationToMs } from '../utils/time'
 import { Session } from '../db/dexie'
 
@@ -16,6 +17,7 @@ interface SessionsTableProps {
 export function SessionsTable({ projectId, showAllProjects = false, sessions: externalSessions, title, todayTotal }: SessionsTableProps) {
   const { getTodaySessions, deleteSession, loadSessions, continueSession, runningSession, sessions } = useSessionsStore()
   const { projects } = useProjectsStore()
+  const { customers } = useCustomersStore()
   const { showConfirm, showToast } = useUIStore()
   const [editingSession, setEditingSession] = useState<Session | null>(null)
 
@@ -61,7 +63,7 @@ export function SessionsTable({ projectId, showAllProjects = false, sessions: ex
       `Are you sure you want to delete this ${formatDurationHHMM(session.durationMs)} session?`,
       async () => {
         await deleteSession(session.id!)
-        
+
         showToast(
           'Session deleted',
           'success',
@@ -84,15 +86,31 @@ export function SessionsTable({ projectId, showAllProjects = false, sessions: ex
   }
 
   const displaySessions = externalSessions || (
-    showAllProjects 
+    showAllProjects
       ? sessions.filter(s => isToday(s.start))
       : getTodaySessions(projectId)
   )
 
   // Filter out the session that is currently being continued
-  const sessionsToList = displaySessions.filter(
-    s => s.id !== runningSession?.continuedFromSessionId
-  );
+  // AND filter out sessions from archived projects or archived customers
+  const sessionsToList = displaySessions.filter(s => {
+    if (s.id === runningSession?.continuedFromSessionId) return false
+
+    // Check if project is archived
+    const project = projects.find(p => p.id === s.projectId)
+    if (project?.archived) return false
+
+    // Check if project's customer is archived
+    if (project?.customerFirestoreId) {
+      const customer = customers.find(c => c.firestoreId === project.customerFirestoreId)
+      if (customer?.archived) return false
+    } else if (project?.customerId) {
+      const customer = customers.find(c => c.id === project.customerId)
+      if (customer?.archived) return false
+    }
+
+    return true
+  });
 
   if (sessionsToList.length === 0) {
     return (
