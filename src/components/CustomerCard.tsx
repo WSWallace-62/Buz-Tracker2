@@ -6,6 +6,7 @@ import { useCustomersStore } from '../store/customers';
 import { useUIStore } from '../store/ui';
 import { formatAddressMultiline } from '../utils/customer';
 import { formatRate } from '../utils/currency';
+import { CustomerProjectManager } from './CustomerProjectManager';
 
 interface CustomerCardProps {
   customer: Customer;
@@ -195,28 +196,14 @@ export function CustomerCard({ customer, onEdit }: CustomerCardProps) {
                 ))}
               </div>
             </div>
-
             {/* Linked Projects */}
-            {projectCount > 0 && (
+            {customer.firestoreId && (
               <div>
-                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Projects</h4>
-                <div className="space-y-1">
-                  {projects?.map((project) => (
-                    <div 
-                      key={project.id}
-                      className="flex items-center text-sm text-gray-600 dark:text-gray-400"
-                    >
-                      <div 
-                        className="w-3 h-3 rounded-full mr-2"
-                        style={{ backgroundColor: project.color }}
-                      />
-                      {project.name}
-                      {project.archived && (
-                        <span className="ml-2 text-xs text-gray-500">(archived)</span>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                <CustomerProjectManager
+                  customerFirestoreId={customer.firestoreId}
+                  customerId={customer.id!}
+                  projects={projects || []}
+                />
               </div>
             )}
           </div>
@@ -225,3 +212,4 @@ export function CustomerCard({ customer, onEdit }: CustomerCardProps) {
     </div>
   );
 }
+

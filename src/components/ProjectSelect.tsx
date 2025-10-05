@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { useProjectsStore } from '../store/projects'
 import { useUIStore } from '../store/ui'
+import { useNavigate } from 'react-router-dom'
 
 interface ProjectSelectProps {
   onProjectChange?: (projectId: number) => void
@@ -9,8 +10,9 @@ interface ProjectSelectProps {
 
 export function ProjectSelect({ onProjectChange, disabled = false }: ProjectSelectProps) {
   const { projects, loadProjects } = useProjectsStore()
-  const { currentProjectId, setCurrentProject, openProjectManager } = useUIStore()
+  const { currentProjectId, setCurrentProject } = useUIStore()
   const [isOpen, setIsOpen] = useState(false)
+  const navigate = useNavigate()
 
   useEffect(() => {
     loadProjects()
@@ -87,33 +89,39 @@ export function ProjectSelect({ onProjectChange, disabled = false }: ProjectSele
       {isOpen && (
         <div className="absolute z-10 mt-1 w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg">
           <ul className="py-1 max-h-60 overflow-auto" role="listbox">
-            {activeProjects.map((project) => (
-              <li key={project.id} role="option" aria-selected={project.id === currentProjectId}>
-                <button
-                  type="button"
-                  onClick={() => handleProjectSelect(project.id!)}
-                  className={`
-                    w-full text-left px-3 py-2 flex items-center hover:bg-gray-50 dark:hover:bg-gray-600
-                    ${project.id === currentProjectId ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-900 dark:text-blue-300' : 'text-gray-900 dark:text-gray-100'}
-                  `}
-                >
-                  <div
-                    className="w-3 h-3 rounded-full mr-2 flex-shrink-0"
-                    style={{ backgroundColor: project.color }}
-                  />
-                  <span className="truncate">{project.name}</span>
-                </button>
+            {activeProjects.length === 0 ? (
+              <li className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400 text-center">
+                No active projects
               </li>
-            ))}
+            ) : (
+              activeProjects.map((project) => (
+                <li key={project.id} role="option" aria-selected={project.id === currentProjectId}>
+                  <button
+                    type="button"
+                    onClick={() => handleProjectSelect(project.id!)}
+                    className={`
+                      w-full text-left px-3 py-2 flex items-center hover:bg-gray-50 dark:hover:bg-gray-600
+                      ${project.id === currentProjectId ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-900 dark:text-blue-300' : 'text-gray-900 dark:text-gray-100'}
+                    `}
+                  >
+                    <div
+                      className="w-3 h-3 rounded-full mr-2 flex-shrink-0"
+                      style={{ backgroundColor: project.color }}
+                    />
+                    <span className="truncate">{project.name}</span>
+                  </button>
+                </li>
+              ))
+            )}
 
             <li className="border-t border-gray-100 dark:border-gray-600">
               <button
                 type="button"
                 onClick={() => {
                   setIsOpen(false)
-                  openProjectManager()
+                  navigate('/customers')
                 }}
-                className="w-full text-left px-3 py-2 flex items-center hover:bg-gray-50 dark:hover:bg-gray-600 text-blue-600 dark:text-blue-300"
+                className="w-full text-left px-3 py-2 flex items-center hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-400 text-sm"
               >
                 <svg
                   className="w-4 h-4 mr-2"
@@ -121,9 +129,9 @@ export function ProjectSelect({ onProjectChange, disabled = false }: ProjectSele
                   stroke="currentColor"
                   viewBox="0 0 24 24"
                 >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                 </svg>
-                Manage Projects
+                Manage projects in Customers
               </button>
             </li>
           </ul>
