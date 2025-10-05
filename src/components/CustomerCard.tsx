@@ -35,14 +35,27 @@ export function CustomerCard({ customer, onEdit }: CustomerCardProps) {
 
   const handleArchive = () => {
     const action = customer.archived ? 'unarchive' : 'archive';
-    showConfirm(
-      `${action.charAt(0).toUpperCase() + action.slice(1)} Customer`,
-      `Are you sure you want to ${action} ${customer.companyName}?`,
-      async () => {
-        await archiveCustomer(customer.id!, !customer.archived);
-        showToast(`Customer ${action}d successfully`, 'success');
-      }
-    );
+
+    // If archiving and has projects, show warning
+    if (!customer.archived && projectCount > 0) {
+      showConfirm(
+        'Archive Customer',
+        `Archiving this customer will also make all ${projectCount} linked ${projectCount === 1 ? 'project' : 'projects'} inactive. Continue?`,
+        async () => {
+          await archiveCustomer(customer.id!, !customer.archived);
+          showToast(`Customer ${action}d successfully`, 'success');
+        }
+      );
+    } else {
+      showConfirm(
+        `${action.charAt(0).toUpperCase() + action.slice(1)} Customer`,
+        `Are you sure you want to ${action} ${customer.companyName}?`,
+        async () => {
+          await archiveCustomer(customer.id!, !customer.archived);
+          showToast(`Customer ${action}d successfully`, 'success');
+        }
+      );
+    }
   };
 
   const handleDelete = () => {
@@ -84,15 +97,17 @@ export function CustomerCard({ customer, onEdit }: CustomerCardProps) {
 
           {/* Action Buttons */}
           <div className="flex gap-2">
-            <button
-              onClick={() => onEdit(customer)}
-              className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-colors"
-              title="Edit customer"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-              </svg>
-            </button>
+            {!customer.archived && (
+              <button
+                onClick={() => onEdit(customer)}
+                className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-colors"
+                title="Edit customer"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+              </button>
+            )}
 
             <button
               onClick={handleArchive}
@@ -104,7 +119,7 @@ export function CustomerCard({ customer, onEdit }: CustomerCardProps) {
               </svg>
             </button>
 
-            {projectCount === 0 && (
+            {projectCount === 0 && !customer.archived && (
               <button
                 onClick={handleDelete}
                 className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors"
@@ -204,6 +219,7 @@ export function CustomerCard({ customer, onEdit }: CustomerCardProps) {
                   customerFirestoreId={customer.firestoreId}
                   customerId={customer.id!}
                   customerName={customer.companyName}
+                  customerArchived={customer.archived || false}
                   projects={projects || []}
                 />
               </div>

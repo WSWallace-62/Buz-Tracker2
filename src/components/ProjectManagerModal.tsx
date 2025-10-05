@@ -134,8 +134,21 @@ export function ProjectManagerModal() {
     return null
   }
 
-  const activeProjects = projects.filter(p => !p.archived)
-  const archivedProjects = projects.filter(p => p.archived)
+  const activeProjects = projects.filter(p => {
+    if (p.archived) return false
+    // Filter out projects from archived customers
+    if (p.customerFirestoreId) {
+      const customer = customers.find(c => c.firestoreId === p.customerFirestoreId)
+      if (customer?.archived) return false
+    } else if (p.customerId) {
+      const customer = customers.find(c => c.id === p.customerId)
+      if (customer?.archived) return false
+    }
+    return true
+  })
+
+  // Don't show archived projects at all
+  const archivedProjects: Project[] = []
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -302,7 +315,7 @@ interface ProjectItemProps {
 
 function ProjectItem({ project, onEdit, onDelete, onArchive }: ProjectItemProps) {
   const { customers } = useCustomersStore();
-  const customer = project.customerFirestoreId 
+  const customer = project.customerFirestoreId
     ? customers.find(c => c.firestoreId === project.customerFirestoreId)
     : undefined;
 
