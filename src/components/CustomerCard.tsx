@@ -202,6 +202,7 @@ export function CustomerCard({ customer, onEdit }: CustomerCardProps) {
                 <CustomerProjectManager
                   customerFirestoreId={customer.firestoreId}
                   customerId={customer.id!}
+                  customerName={customer.companyName}
                   projects={projects || []}
                 />
               </div>

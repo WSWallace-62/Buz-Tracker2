@@ -86,13 +86,23 @@ export function ProjectManagerModal() {
   }
 
   const handleDelete = (project: Project) => {
+    // Find the customer name if the project is linked to a customer
+    const customer = project.customerFirestoreId
+      ? customers.find(c => c.firestoreId === project.customerFirestoreId)
+      : undefined;
+
+    const customerInfo = customer ? ` from ${customer.companyName}` : '';
+    const confirmText = `Delete-${project.name}`;
+
     showConfirm(
       'Delete Project',
-      `Are you sure you want to delete "${project.name}"? This will also delete all associated time sessions.`,
+      `Are you sure you want to delete "${project.name}"${customerInfo}?\n\nThis will also delete all associated time sessions.\n\nThis action cannot be undone.`,
       async () => {
         await deleteProject(project.id!)
         showToast('Project deleted', 'success')
-      }
+      },
+      undefined,
+      confirmText
     )
   }
 

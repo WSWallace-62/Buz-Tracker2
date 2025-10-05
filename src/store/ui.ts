@@ -20,6 +20,7 @@ interface UIState {
     message: string
     onConfirm: () => void
     onCancel?: () => void
+    requireText?: string  // Optional: text that must be typed to enable confirm button
   } | null
   toasts: ToastState[]
   currentProjectId: number | null
@@ -28,7 +29,7 @@ interface UIState {
   closeProjectManager: () => void
   openAddEntryModal: () => void
   closeAddEntryModal: () => void
-  showConfirm: (title: string, message: string, onConfirm: () => void, onCancel?: () => void) => void
+  showConfirm: (title: string, message: string, onConfirm: () => void, onCancel?: () => void, requireText?: string) => void
   hideConfirm: () => void
   showToast: (message: string, type?: 'success' | 'error' | 'info', action?: { label: string; onClick: () => void }) => void
   removeToast: (id: string) => void
@@ -50,14 +51,15 @@ export const useUIStore = create<UIState>((set, get) => ({
   openAddEntryModal: () => set({ isAddEntryModalOpen: true }),
   closeAddEntryModal: () => set({ isAddEntryModalOpen: false }),
 
-  showConfirm: (title, message, onConfirm, onCancel) => {
+  showConfirm: (title, message, onConfirm, onCancel, requireText) => {
     set({
       confirmDialog: {
         isOpen: true,
         title,
         message,
         onConfirm,
-        onCancel
+        onCancel,
+        requireText
       }
     })
   },
@@ -65,7 +67,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   hideConfirm: () => set({ confirmDialog: null }),
 
   showToast: (message, type = 'info', action) => {
-    const id = Math.random().toString(36).substr(2, 9);
+    const id = Math.random().toString(36).substring(2, 11);
     const toast: ToastState = { id, message, type, action };
 
     set(state => ({

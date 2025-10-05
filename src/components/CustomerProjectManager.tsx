@@ -12,10 +12,11 @@ const COLORS = [
 interface CustomerProjectManagerProps {
   customerFirestoreId: string;
   customerId: number;
+  customerName: string;  // Add customer name for better context in dialogs
   projects: Project[];
 }
 
-export function CustomerProjectManager({ customerFirestoreId, customerId, projects }: CustomerProjectManagerProps) {
+export function CustomerProjectManager({ customerFirestoreId, customerId, customerName, projects }: CustomerProjectManagerProps) {
   const { createProject, updateProject, deleteProject, archiveProject } = useProjectsStore();
   const { showConfirm, showToast } = useUIStore();
   const [isCreating, setIsCreating] = useState(false);
@@ -71,13 +72,16 @@ export function CustomerProjectManager({ customerFirestoreId, customerId, projec
   };
 
   const handleDelete = (project: Project) => {
+    const confirmText = `Delete-${project.name}`;
     showConfirm(
       'Delete Project',
-      `Are you sure you want to delete "${project.name}"? This will also delete all associated time sessions.`,
+      `Are you sure you want to delete "${project.name}" from ${customerName}?\n\nThis will also delete all associated time sessions.\n\nThis action cannot be undone.`,
       async () => {
         await deleteProject(project.id!);
         showToast('Project deleted', 'success');
-      }
+      },
+      undefined,
+      confirmText
     );
   };
 
