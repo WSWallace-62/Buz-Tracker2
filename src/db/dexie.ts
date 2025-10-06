@@ -76,6 +76,37 @@ export interface PredefinedNote {
   firestoreId?: string
 }
 
+// New: Organization and CorporateInfo types
+export interface CorporateInfo {
+  companyName: string
+  streetAddress: string
+  city: string
+  province: string
+  postalCode: string
+  areaCode: string
+  phone: string
+  email: string
+  gstNumber: string
+  logoUrl?: string
+}
+
+export interface Organization {
+  id?: number
+  firestoreId?: string
+  corporateInfo: CorporateInfo
+  createdBy: string  // userId
+  createdAt: number
+  updatedAt: number
+}
+
+export interface User {
+  id?: number
+  userId: string  // Firebase Auth UID
+  organizationId?: string  // Firestore organization ID
+  role?: 'owner' | 'admin' | 'user'
+  updatedAt: number
+}
+
 export class BuzTrackerDB extends Dexie {
   projects!: Table<Project>
   sessions!: Table<Session>
@@ -83,9 +114,23 @@ export class BuzTrackerDB extends Dexie {
   runningSession!: Table<RunningSession>
   predefinedNotes!: Table<PredefinedNote>
   customers!: Table<Customer>
+  organizations!: Table<Organization>
+  users!: Table<User>
 
   constructor() {
     super('BuzTrackerDB')
+
+    // Bump DB version to 615 to add organizations and users tables
+    this.version(615).stores({
+      projects: '++id, firestoreId, name, createdAt, archived, customerId, customerFirestoreId',
+      sessions: '++id, projectId, firestoreId, start, stop, createdAt, *note',
+      settings: '++id',
+      runningSession: '++id, running, projectId, startTs, isPaused, continuedFromSessionId',
+      predefinedNotes: '++id, firestoreId, note, createdAt',
+      customers: '++id, firestoreId, companyName, createdAt, archived',
+      organizations: '++id, firestoreId, createdBy, createdAt, updatedAt',
+      users: '++id, userId, organizationId, role, updatedAt'
+    })
 
     // Bump DB version to 614 to add customerFirestoreId to projects
     this.version(614).stores({
@@ -219,7 +264,9 @@ export async function clearDatabase() {
     db.settings.clear(),
     db.runningSession.clear(),
     db.predefinedNotes.clear(),
-    db.customers.clear()
+    db.customers.clear(),
+    db.organizations.clear(),
+    db.users.clear()
   ]);
 }
 

@@ -8,6 +8,7 @@ import { useUIStore } from './store/ui';
 import { useAuthStore } from './store/auth';
 import { usePredefinedNotesStore } from './store/predefinedNotes';
 import { useCustomersStore } from './store/customers';
+import { useOrganizationStore } from './store/organization';
 import { db, clearDatabase } from './db/dexie';
 import { auth } from './firebase';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
@@ -26,13 +27,14 @@ const HistoryPanel = lazy(() => import('./components/HistoryPanel').then(module 
 const SettingsPage = lazy(() => import('./pages/SettingsPage').then(module => ({ default: module.SettingsPage })));
 const ProfilePage = lazy(() => import('./pages/ProfilePage').then(module => ({ default: module.ProfilePage })));
 const CustomersPage = lazy(() => import('./pages/CustomersPage'));
+const CorporatePage = lazy(() => import('./pages/CorporatePage').then(module => ({ default: module.CorporatePage })));
 const FAQPage = lazy(() => import('./pages/FAQPage').then(module => ({ default: module.FAQPage })));
 const Auth = lazy(() => import('./components/Auth').then(module => ({ default: module.Auth })));
 const AddEntryModal = lazy(() => import('./components/AddEntryModal').then(module => ({ default: module.AddEntryModal })));
 const ProjectManagerModal = lazy(() => import('./components/ProjectManagerModal').then(module => ({ default: module.ProjectManagerModal })));
 const ConfirmDialog = lazy(() => import('./components/ConfirmDialog').then(module => ({ default: module.ConfirmDialog })));
 
-type Tab = 'tracker' | 'history' | 'settings' | 'profile' | 'customers' | 'faq';
+type Tab = 'tracker' | 'history' | 'settings' | 'profile' | 'customers' | 'corporate' | 'faq';
 
 export function App() {
   return (
@@ -48,12 +50,13 @@ function AppContent() {
   const { getTodaySessions, startSync, stopSync } = useSessionsStore();
   const { startPredefinedNotesSync, stopPredefinedNotesSync } = usePredefinedNotesStore();
   const { startCustomerSync, stopCustomerSync, loadCustomers } = useCustomersStore();
+  const { startOrganizationSync, stopOrganizationSync, loadOrganization } = useOrganizationStore();
   const { currentProjectId, setCurrentProject, openAddEntryModal, theme, setTheme } = useUIStore();
   const { user, setUserAndOrg, isLoading: isAuthLoading } = useAuthStore();
   const [isGuest, setIsGuest] = useState(false);
   const location = useLocation();
 
-  const activeTab: Tab = location.pathname === '/history' ? 'history' : location.pathname === '/settings' ? 'settings' : location.pathname === '/profile' ? 'profile' : location.pathname === '/customers' ? 'customers' : location.pathname === '/faq' ? 'faq' : 'tracker';
+  const activeTab: Tab = location.pathname === '/history' ? 'history' : location.pathname === '/settings' ? 'settings' : location.pathname === '/profile' ? 'profile' : location.pathname === '/customers' ? 'customers' : location.pathname === '/corporate' ? 'corporate' : location.pathname === '/faq' ? 'faq' : 'tracker';
 
   const { runningSession, getCurrentElapsed, loadSessions, loadRunningSession } = useSessionsStore();
 
@@ -95,19 +98,19 @@ function AppContent() {
       startSync();
       startPredefinedNotesSync();
       startCustomerSync();
+      await startOrganizationSync();
     } else if (isGuest) {
       await loadSessions();
       await loadCustomers();
+      await loadOrganization();
     }
 
-    if (currentUser || isGuest) {
-      await loadRunningSession();
-      const settings = await db.settings.toCollection().first();
-      if (settings?.lastProjectId) {
-        setCurrentProject(settings.lastProjectId);
-      }
+    await loadRunningSession();
+    const lastProject = await db.settings.toCollection().first();
+    if (lastProject?.lastProjectId) {
+      setCurrentProject(lastProject.lastProjectId);
     }
-  }, [isGuest, setUserAndOrg, reconcileProjects, loadSessions, loadRunningSession, startSync, setCurrentProject, startProjectSync, startPredefinedNotesSync, startCustomerSync, loadCustomers]);
+  }, [isGuest, setUserAndOrg, reconcileProjects, loadSessions, loadRunningSession, startSync, setCurrentProject, startProjectSync, startPredefinedNotesSync, startCustomerSync, startOrganizationSync, loadCustomers, loadOrganization]);
 
   useEffect(() => {
     // onAuthStateChanged returns an unsubscribe function that we can use for cleanup.
@@ -175,6 +178,7 @@ function AppContent() {
     stopSync();
     stopPredefinedNotesSync();
     stopCustomerSync();
+    stopOrganizationSync();
     if (auth) {
       await signOut(auth);
     }
@@ -244,17 +248,22 @@ function AppContent() {
               {[
                 { id: 'tracker', label: 'Time Tracker', path: '/' },
                 { id: 'history', label: 'History', path: '/history' }
-              ].map((tab) => (
-                <Link
-                  key={tab.id}
-                  to={tab.path}
-                  className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === tab.id ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'}`}
-                >
-                  {tab.label}
-                </Link>
-              ))}
+              ].map((tab) => {
+                return (
+                  <Link
+                    key={tab.id}
+                    to={tab.path}
+                    className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === tab.id ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'}`}
+                  >
+                    {tab.label}
+                  </Link>
+                );
+              })}
             </div>
-            <span aria-hidden="true" className="text-sm font-medium text-gray-500 dark:text-gray-400 py-4">Rev 2.4</span>
+            <div className="flex items-center py-4" aria-label="Application version">
+              <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Rev</span>
+              <span className="ml-1 text-sm font-semibold text-gray-500 dark:text-gray-300">2.5</span>
+            </div>
           </div>
         </div>
       </nav>
@@ -285,6 +294,7 @@ function AppContent() {
               </div>
             } />
             <Route path="/customers" element={<CustomersPage />} />
+            <Route path="/corporate" element={<CorporatePage />} />
             <Route path="/history" element={<HistoryPanel />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/settings" element={<SettingsPage />} />
