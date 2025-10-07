@@ -43,6 +43,7 @@ export function CorporatePage() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
     loadOrganization();
@@ -81,6 +82,7 @@ export function CorporatePage() {
   };
 
   const handleInputChange = (field: keyof CorporateInfo, value: string) => {
+    if (!isEditing) return; // ignore changes when not editing
     setFormData(prev => ({ ...prev, [field]: value }));
     // Clear validation error for this field when user starts typing
     if (validationErrors[field]) {
@@ -132,6 +134,7 @@ export function CorporatePage() {
       
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
+      setIsEditing(false);
     } catch (error) {
       console.error('Error saving corporate info:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to save corporate information. Please try again.';
@@ -159,6 +162,7 @@ export function CorporatePage() {
       });
     }
     setValidationErrors({});
+    setIsEditing(false);
   };
 
   if (isLoading) {
@@ -231,6 +235,7 @@ export function CorporatePage() {
               id="companyName"
               value={formData.companyName}
               onChange={(e) => handleInputChange('companyName', e.target.value)}
+              disabled={!isEditing}
               className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white ${
                 validationErrors.companyName ? 'border-red-500' : 'border-gray-300'
               }`}
@@ -251,6 +256,7 @@ export function CorporatePage() {
               id="streetAddress"
               value={formData.streetAddress}
               onChange={(e) => handleInputChange('streetAddress', e.target.value)}
+              disabled={!isEditing}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
               placeholder="123 Main Street"
             />
@@ -267,6 +273,7 @@ export function CorporatePage() {
                 id="city"
                 value={formData.city}
                 onChange={(e) => handleInputChange('city', e.target.value)}
+                disabled={!isEditing}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                 placeholder="Vancouver"
               />
@@ -280,6 +287,7 @@ export function CorporatePage() {
                 id="province"
                 value={formData.province}
                 onChange={(e) => handleInputChange('province', e.target.value)}
+                disabled={!isEditing}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
               >
                 {CANADIAN_PROVINCES.map(prov => (
@@ -297,6 +305,7 @@ export function CorporatePage() {
                 id="postalCode"
                 value={formData.postalCode}
                 onChange={(e) => handleInputChange('postalCode', e.target.value.toUpperCase())}
+                disabled={!isEditing}
                 className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white ${
                   validationErrors.postalCode ? 'border-red-500' : 'border-gray-300'
                 }`}
@@ -320,6 +329,7 @@ export function CorporatePage() {
                 id="areaCode"
                 value={formData.areaCode}
                 onChange={(e) => handleInputChange('areaCode', e.target.value.replace(/\D/g, ''))}
+                disabled={!isEditing}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                 placeholder="250"
                 maxLength={3}
@@ -335,6 +345,7 @@ export function CorporatePage() {
                 id="phone"
                 value={formData.phone}
                 onChange={(e) => handleInputChange('phone', e.target.value.replace(/\D/g, ''))}
+                disabled={!isEditing}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                 placeholder="5551234"
                 maxLength={7}
@@ -352,6 +363,7 @@ export function CorporatePage() {
               id="email"
               value={formData.email}
               onChange={(e) => handleInputChange('email', e.target.value)}
+              disabled={!isEditing}
               className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white ${
                 validationErrors.email ? 'border-red-500' : 'border-gray-300'
               }`}
@@ -372,6 +384,7 @@ export function CorporatePage() {
               id="gstNumber"
               value={formData.gstNumber}
               onChange={(e) => handleInputChange('gstNumber', e.target.value.toUpperCase())}
+              disabled={!isEditing}
               className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white ${
                 validationErrors.gstNumber ? 'border-red-500' : 'border-gray-300'
               }`}
@@ -394,6 +407,7 @@ export function CorporatePage() {
               id="logoUrl"
               value={formData.logoUrl}
               onChange={(e) => handleInputChange('logoUrl', e.target.value)}
+              disabled={!isEditing}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
               placeholder="https://example.com/logo.png"
             />
@@ -402,28 +416,42 @@ export function CorporatePage() {
 
           {/* Action Buttons */}
           <div className="flex items-center justify-end space-x-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-            <button
-              type="button"
-              onClick={handleCancel}
-              disabled={isSaving}
-              className="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSaving}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
-            >
-              {isSaving ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  <span>Saving...</span>
-                </>
-              ) : (
-                <span>{organization ? 'Update' : 'Create'} Corporate Info</span>
-              )}
-            </button>
+            {!isEditing ? (
+              <button
+                type="button"
+                onClick={() => setIsEditing(true)}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                disabled={user?.isAnonymous || !isOnline}
+                title={user?.isAnonymous ? 'Guest users cannot edit corporate info' : (!isOnline ? 'You must be online to edit corporate info' : undefined)}
+              >
+                Enable Editing
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={handleCancel}
+                  disabled={isSaving}
+                  className="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSaving}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                >
+                  {isSaving ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <span>{organization ? 'Update' : 'Create'} Corporate Info</span>
+                  )}
+                </button>
+              </>
+            )}
           </div>
         </div>
       </form>
