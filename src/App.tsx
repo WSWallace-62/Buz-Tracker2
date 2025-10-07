@@ -262,7 +262,7 @@ function AppContent() {
             </div>
             <div className="flex items-center py-4" aria-label="Application version">
               <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Rev</span>
-              <span className="ml-1 text-sm font-semibold text-gray-500 dark:text-gray-300">2.5</span>
+              <span className="ml-1 text-sm font-semibold text-gray-500 dark:text-gray-300">2.6</span>
             </div>
           </div>
         </div>
