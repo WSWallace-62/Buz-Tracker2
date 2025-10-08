@@ -1,0 +1,12 @@
+[
+  {
+    "origin": [
+      "http://localhost:5173",
+      "https://buz-tracker-fd3e3.web.app",
+      "https://buz-tracker-fd3e3.firebaseapp.com"
+    ],
+    "method": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    "responseHeader": ["Content-Type", "Authorization"],
+    "maxAgeSeconds": 3600
+  }
+]
