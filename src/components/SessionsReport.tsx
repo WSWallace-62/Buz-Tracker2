@@ -1,5 +1,10 @@
+import { useEffect, useMemo, useState } from 'react';
 import { Session, Project } from '../db/dexie';
 import { formatDurationHours, formatDate, getTotalDuration } from '../utils/time';
+import { useCustomersStore } from '../store/customers';
+import { useOrganizationStore } from '../store/organization';
+import { auth, db as firestoreDB } from '../firebase';
+import { doc, getDoc } from 'firebase/firestore';
 
 interface SessionsReportProps {
   project: Project | null;
@@ -11,6 +16,54 @@ interface SessionsReportProps {
 }
 
 export function SessionsReport({ project, sessions, dateRange, logoUrl, projects, theme = 'light' }: SessionsReportProps) {
+  // Stores
+  const { customers } = useCustomersStore();
+  const { organization } = useOrganizationStore();
+
+  // Resolve organization/company name
+  const organizationName = organization?.corporateInfo?.companyName || '';
+
+  // Resolve user name from Firestore users doc; fallback to auth displayName/email
+  const [userName, setUserName] = useState<string>('');
+  useEffect(() => {
+    let didCancel = false;
+    const loadName = async () => {
+      const user = auth?.currentUser;
+      if (!user) {
+        setUserName('');
+        return;
+      }
+
+      // Try Firestore first (firstName + lastName)
+      try {
+        if (firestoreDB) {
+          const snap = await getDoc(doc(firestoreDB, 'users', user.uid));
+          const data = snap.exists() ? snap.data() as any : null;
+          const first = data?.firstName?.toString().trim();
+          const last = data?.lastName?.toString().trim();
+          const composed = [first, last].filter(Boolean).join(' ');
+          if (!didCancel && composed) {
+            setUserName(composed);
+            return;
+          }
+        }
+      } catch {
+        // ignore and fall back
+      }
+
+      // Fallbacks
+      const byDisplay = user.displayName?.trim();
+      if (!didCancel && byDisplay) {
+        setUserName(byDisplay);
+        return;
+      }
+      const byEmail = user.email ? user.email.split('@')[0] : '';
+      if (!didCancel) setUserName(byEmail);
+    };
+    loadName();
+    return () => { didCancel = true; };
+  }, []);
+
   // Separate sessions into regular and travel sessions
   const regularSessions = sessions.filter(session => 
     !session.note?.toLowerCase().includes('travel')
@@ -33,6 +86,46 @@ export function SessionsReport({ project, sessions, dateRange, logoUrl, projects
     return project?.name || 'Unknown Project';
   };
 
+  // Resolve the customer for the provided project (handles both firestoreId and local id links)
+  const customerNameForSelectedProject = useMemo(() => {
+    if (!project) return '';
+    if (project.customerFirestoreId) {
+      const c = customers.find(cu => cu.firestoreId === project.customerFirestoreId);
+      return c?.companyName || '';
+    }
+    if (project.customerId) {
+      const c = customers.find(cu => cu.id === project.customerId);
+      return c?.companyName || '';
+    }
+    return '';
+  }, [project, customers]);
+
+  // Build a robust list of potential logo sources and fallback if one fails
+  const candidateLogoUrls = useMemo(() => {
+    const list: string[] = [];
+    if (organization?.corporateInfo?.logoUrl) list.push(organization.corporateInfo.logoUrl);
+    if (logoUrl) list.push(logoUrl);
+    // Common public paths fallbacks
+    list.push('/company-logo.png', '/company-logo.jpg', '/company-logo.webp', '/company-logo.png.jpg');
+    // Deduplicate while preserving order
+    return Array.from(new Set(list.filter(Boolean)));
+  }, [organization?.corporateInfo?.logoUrl, logoUrl]);
+
+  const [logoSrc, setLogoSrc] = useState<string | null>(null);
+  useEffect(() => {
+    setLogoSrc(candidateLogoUrls.length > 0 ? candidateLogoUrls[0] : null);
+  }, [candidateLogoUrls]);
+
+  const handleLogoError = () => {
+    if (!logoSrc) return;
+    const idx = candidateLogoUrls.indexOf(logoSrc);
+    if (idx >= 0 && idx < candidateLogoUrls.length - 1) {
+      setLogoSrc(candidateLogoUrls[idx + 1]);
+    } else {
+      setLogoSrc(null);
+    }
+  };
+
   // Define theme-based classes
   const isDark = theme === 'dark';
   const bgClass = isDark ? 'bg-gray-900' : 'bg-white';
@@ -47,27 +140,51 @@ export function SessionsReport({ project, sessions, dateRange, logoUrl, projects
   const hoverBgClass = isDark ? 'hover:bg-gray-800' : 'hover:bg-gray-50';
   const footerTextClass = isDark ? 'text-gray-200' : 'text-gray-700';
   const totalTextClass = isDark ? 'text-gray-50' : 'text-gray-900';
+  const placeholderBorderClass = isDark ? 'border-gray-400' : 'border-gray-500';
 
   return (
     <div className={`${bgClass} p-6 font-sans ${textClass} text-xs print:bg-white print:text-gray-800`}>
       {/* Report Header */}
-      <header className={`flex justify-between items-start mb-6 border-b ${borderClass} pb-3 print:border-gray-300`}>
+      <header className={`mb-6 border-b ${borderClass} pb-3 print:border-gray-300`}>
         <div>
-          <h1 className={`text-2xl font-bold ${headerTextClass} print:text-gray-900`}>
+          {/* Logo above organization name */}
+          <div className="w-32 h-32 mb-2 flex items-center justify-start">
+            { logoSrc ? (
+              <img
+                src={logoSrc}
+                onError={handleLogoError}
+                alt=""
+                role="presentation"
+                className="max-w-full max-h-full object-contain"
+              />
+            ) : (
+              <div
+                className={`w-full h-full border-2 border-dashed ${placeholderBorderClass} rounded-sm print:border-gray-300`}
+                aria-hidden="true"
+              />
+            )}
+          </div>
+          {/* Organization and User lines */}
+          {organizationName && (
+            <p className={`text-sm ${subTextClass} print:text-gray-600`}>{organizationName}</p>
+          )}
+          {userName && (
+            <p className={`text-xs ${mutedTextClass} print:text-gray-500`}>{userName}</p>
+          )}
+          <h1 className={`text-2xl font-bold ${headerTextClass} print:text-gray-900 mt-6`}>
             Time Log Report
           </h1>
           <p className={`text-sm ${subTextClass} print:text-gray-600`}>
-            {project ? project.name : 'All Projects'}
+            {project ? (
+              customerNameForSelectedProject
+                ? `${project.name} • for ${customerNameForSelectedProject}`
+                : project.name
+            ) : 'All Projects'}
           </p>
           <p className={`text-xs ${mutedTextClass} mt-1 print:text-gray-500`}>
             {formatDate(new Date(dateRange.start).getTime())} to {formatDate(new Date(dateRange.end).getTime())}
           </p>
         </div>
-        {logoUrl && (
-          <div className="w-24 h-auto">
-            <img src={logoUrl} alt="Company Logo" />
-          </div>
-        )}
       </header>
 
       {/* Regular Sessions Table */}
