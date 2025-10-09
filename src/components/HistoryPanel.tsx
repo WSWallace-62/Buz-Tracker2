@@ -588,6 +588,8 @@ export function HistoryPanel() {
               sessions={filteredSessions}
               dateRange={{ start: customStart || formatDate(startDate), end: customEnd || formatDate(endDate) }}
               projects={projects}
+              // Optional logo: place a file at public/company-logo.png to display
+              logoUrl="/company-logo.png"
               theme={theme}
             />
           </div>
