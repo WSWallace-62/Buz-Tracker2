@@ -3,7 +3,7 @@ import { useSessionsStore } from '../store/sessions'
 import { useProjectsStore } from '../store/projects'
 import { useUIStore } from '../store/ui'
 import { useCustomersStore } from '../store/customers'
-import { formatTime, formatDurationHHMM, isToday, formatDate, parseDurationToMs } from '../utils/time'
+import { formatDurationHHMM, isToday, formatDate, parseDurationToMs } from '../utils/time'
 import { Session } from '../db/dexie'
 
 interface SessionsTableProps {
@@ -157,12 +157,6 @@ export function SessionsTable({ projectId, showAllProjects = false, sessions: ex
                 </th>
               )}
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                Start
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                End
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                 Duration
               </th>
               {showAllProjects && (
@@ -186,12 +180,6 @@ export function SessionsTable({ projectId, showAllProjects = false, sessions: ex
                     {formatDate(session.start)}
                   </td>
                 )}
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                  {formatTime(session.start)}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                  {session.stop ? formatTime(session.stop) : '-'}
-                </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
                   {formatDurationHHMM(session.durationMs)}
                 </td>
