@@ -221,6 +221,11 @@ function AppContent() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
+              <img
+                src="/company-logo.png.jpg"
+                alt="Company Logo"
+                className="h-10 w-auto mr-3"
+              />
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white">BuzTracker</h1>
               {!isOnline && (
                 <div className="ml-2" title="You are currently offline.">
@@ -262,7 +267,7 @@ function AppContent() {
             </div>
             <div className="flex items-center py-4" aria-label="Application version">
               <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Rev</span>
-              <span className="ml-1 text-sm font-semibold text-gray-500 dark:text-gray-300">2.7</span>
+              <span className="ml-1 text-sm font-semibold text-gray-500 dark:text-gray-300">2.8</span>
             </div>
           </div>
         </div>
