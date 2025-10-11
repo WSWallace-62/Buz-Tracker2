@@ -132,6 +132,7 @@ interface SessionsState {
   // Sync actions
   startSync: () => void;
   stopSync: () => void;
+  reconcileSessions: () => Promise<void>;
 
   // Running session management
   loadRunningSession: () => Promise<void>;
@@ -258,6 +259,50 @@ export const useSessionsStore = create<SessionsState>((set, get) => ({
       unsubscribeFromFirestore();
       unsubscribeFromFirestore = null;
       set({ isSyncing: false });
+    }
+  },
+
+  reconcileSessions: async () => {
+    const user = getAuth().currentUser;
+    if (!user || !firestoreDb) return;
+
+    try {
+      const unsyncedSessions = await db.sessions.filter(s => !s.firestoreId).toArray();
+      if (unsyncedSessions.length === 0) return;
+
+      const projects = useProjectsStore.getState().projects;
+
+      for (const session of unsyncedSessions) {
+        const project = projects.find(p => p.id === session.projectId);
+
+        if (project?.firestoreId) {
+          const sessionForFirestore = {
+            projectId: project.firestoreId,
+            start: session.start,
+            stop: session.stop,
+            durationMs: session.durationMs,
+            note: session.note,
+            createdAt: session.createdAt,
+          };
+
+          try {
+            const docRef = await addDoc(
+              collection(firestoreDb, 'users', user.uid, 'sessions'),
+              sessionForFirestore
+            );
+
+            if (session.id) {
+              await db.sessions.update(session.id, { firestoreId: docRef.id });
+            }
+          } catch (error) {
+            console.error(`Failed to upload session ${session.id}:`, error);
+          }
+        }
+      }
+
+      await get().loadSessions();
+    } catch (error) {
+      console.error("Session reconciliation failed:", error);
     }
   },
 

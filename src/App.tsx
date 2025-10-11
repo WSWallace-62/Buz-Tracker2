@@ -47,7 +47,7 @@ export function App() {
 function AppContent() {
   const isOnline = useOnlineStatus();
   const { reconcileProjects, startProjectSync, stopProjectSync } = useProjectsStore();
-  const { getTodaySessions, startSync, stopSync } = useSessionsStore();
+  const { getTodaySessions, startSync, stopSync, reconcileSessions } = useSessionsStore();
   const { startPredefinedNotesSync, stopPredefinedNotesSync } = usePredefinedNotesStore();
   const { startCustomerSync, stopCustomerSync, loadCustomers } = useCustomersStore();
   const { startOrganizationSync, stopOrganizationSync, loadOrganization } = useOrganizationStore();
@@ -94,6 +94,7 @@ function AppContent() {
     if (currentUser) {
       setIsGuest(false);
       await reconcileProjects();
+      await reconcileSessions();
       startProjectSync();
       startSync();
       startPredefinedNotesSync();
@@ -110,7 +111,7 @@ function AppContent() {
     if (lastProject?.lastProjectId) {
       setCurrentProject(lastProject.lastProjectId);
     }
-  }, [isGuest, setUserAndOrg, reconcileProjects, loadSessions, loadRunningSession, startSync, setCurrentProject, startProjectSync, startPredefinedNotesSync, startCustomerSync, startOrganizationSync, loadCustomers, loadOrganization]);
+  }, [isGuest, setUserAndOrg, reconcileProjects, reconcileSessions, loadSessions, loadRunningSession, startSync, setCurrentProject, startProjectSync, startPredefinedNotesSync, startCustomerSync, startOrganizationSync, loadCustomers, loadOrganization]);
 
   useEffect(() => {
     // onAuthStateChanged returns an unsubscribe function that we can use for cleanup.
@@ -224,7 +225,8 @@ function AppContent() {
               <img
                 src="/company-logo.png.jpg"
                 alt="Company Logo"
-                className="h-10 w-auto mr-3"
+                className="h-10 mr-3"
+                style={{ width: 'auto', aspectRatio: '856/1040' }}
               />
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white">BuzTracker</h1>
               {!isOnline && (
@@ -267,7 +269,7 @@ function AppContent() {
             </div>
             <div className="flex items-center py-4" aria-label="Application version">
               <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Rev</span>
-              <span className="ml-1 text-sm font-semibold text-gray-500 dark:text-gray-300">2.8</span>
+              <span className="ml-1 text-sm font-semibold text-gray-500 dark:text-gray-300">2.9</span>
             </div>
           </div>
         </div>
