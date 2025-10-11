@@ -21,52 +21,52 @@ export function AddTravelDistanceModal() {
 
   const [unit, setUnit] = useState<'km' | 'mile'>('km');
 
-  // Get active customers (not archived)
-  const activeCustomers = useMemo(() => customers.filter(c => !c.archived), [customers]);
-
   // Get the current project
   const currentProject = useMemo(
     () => projects.find(p => p.id === currentProjectId),
     [projects, currentProjectId]
   );
 
-  // Get projects for selected customer
-  const selectedCustomer = useMemo(
-    () => activeCustomers.find(c => c.id?.toString() === formData.customerId),
-    [activeCustomers, formData.customerId]
-  );
+  // Get the customer for the current project (used for displaying customer info)
+  const selectedCustomer = useMemo(() => {
+    if (!currentProject) return null;
 
-  const customerProjects = useMemo(
-    () =>
-      selectedCustomer
-        ? projects.filter(
-            p =>
-              !p.archived &&
-              (p.customerFirestoreId === selectedCustomer.firestoreId || p.customerId === selectedCustomer.id)
-          )
-        : [],
-    [selectedCustomer, projects]
-  );
+    // First try to find by customerFirestoreId
+    if (currentProject.customerFirestoreId) {
+      const customer = customers.find(c => c.firestoreId === currentProject.customerFirestoreId);
+      if (customer) return customer;
+    }
+
+    // Fallback to customerId
+    if (currentProject.customerId) {
+      return customers.find(c => c.id === currentProject.customerId);
+    }
+
+    return null;
+  }, [currentProject, customers]);
 
   // Update unit when customer changes
-  useEffect(() => {
-    if (selectedCustomer) {
-      setUnit(selectedCustomer.distanceUnit || 'km');
-    }
-  }, [selectedCustomer]);
 
   // Reset form when modal opens - auto-populate from current project
   useEffect(() => {
     if (isTravelDistanceModalOpen) {
       // If there's a current project, use it and its customer
       if (currentProject) {
-        const projectCustomerId = currentProject.customerId?.toString() ||
-                                  (currentProject.customerFirestoreId ?
-                                    customers.find(c => c.firestoreId === currentProject.customerFirestoreId)?.id?.toString() :
-                                    '');
+        // Find the customer for this project
+        let projectCustomer = null;
+
+        // First try to find by customerFirestoreId
+        if (currentProject.customerFirestoreId) {
+          projectCustomer = customers.find(c => c.firestoreId === currentProject.customerFirestoreId);
+        }
+
+        // Fallback to customerId if customerFirestoreId didn't work
+        if (!projectCustomer && currentProject.customerId) {
+          projectCustomer = customers.find(c => c.id === currentProject.customerId);
+        }
 
         setFormData({
-          customerId: projectCustomerId || '',
+          customerId: projectCustomer?.id?.toString() || '',
           projectId: currentProject.id?.toString() || '',
           date: dayjs().format('YYYY-MM-DD'),
           distance: '',
@@ -74,12 +74,8 @@ export function AddTravelDistanceModal() {
         });
 
         // Set unit from customer if available
-        const customer = customers.find(c =>
-          c.id?.toString() === projectCustomerId ||
-          c.firestoreId === currentProject.customerFirestoreId
-        );
-        if (customer) {
-          setUnit(customer.distanceUnit || 'km');
+        if (projectCustomer) {
+          setUnit(projectCustomer.distanceUnit || 'km');
         }
       } else {
         // No current project, reset to empty
@@ -95,35 +91,12 @@ export function AddTravelDistanceModal() {
     }
   }, [isTravelDistanceModalOpen, currentProject, customers]);
 
-  // Auto-select project when customer changes
-  useEffect(() => {
-    if (formData.customerId && customerProjects.length > 0) {
-      // If current project is not in the list, select the first one
-      const currentProjectValid = customerProjects.some(p => p.id?.toString() === formData.projectId);
-      if (!currentProjectValid) {
-        setFormData(prev => ({ ...prev, projectId: customerProjects[0].id?.toString() || '' }));
-      }
-    } else {
-      setFormData(prev => ({ ...prev, projectId: '' }));
-    }
-  }, [formData.customerId, formData.projectId, customerProjects]);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validation - check if project is selected
-    if (!currentProject) {
-      showToast('Please select a project first', 'error');
-      return;
-    }
-
-    if (!formData.customerId) {
-      showToast('Customer information is missing', 'error');
-      return;
-    }
-
+    // Validation - only check for project since customer is derived from project
     if (!formData.projectId) {
-      showToast('Project information is missing', 'error');
+      showToast('Please select a project', 'error');
       return;
     }
 
@@ -140,10 +113,32 @@ export function AddTravelDistanceModal() {
     try {
       const dateTimestamp = dayjs(formData.date).startOf('day').valueOf();
 
+      // Get the selected project to derive customer information
+      const selectedProject = projects.find(p => p.id?.toString() === formData.projectId);
+      if (!selectedProject) {
+        showToast('Selected project not found', 'error');
+        return;
+      }
+
+      // Derive customer ID from project
+      let customerId = selectedProject.customerId;
+      const customerFirestoreId = selectedProject.customerFirestoreId;
+
+      // If customerId is not set but customerFirestoreId is, find the local customer ID
+      if (!customerId && customerFirestoreId) {
+        const customer = customers.find(c => c.firestoreId === customerFirestoreId);
+        customerId = customer?.id;
+      }
+
+      if (!customerId) {
+        showToast('Could not determine customer for this project', 'error');
+        return;
+      }
+
       await createTravelEntry({
         projectId: parseInt(formData.projectId),
-        customerId: parseInt(formData.customerId),
-        customerFirestoreId: selectedCustomer?.firestoreId,
+        customerId: customerId,
+        customerFirestoreId: customerFirestoreId,
         date: dateTimestamp,
         distance: parseFloat(formData.distance),
         unit,

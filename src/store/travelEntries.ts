@@ -43,7 +43,7 @@ interface TravelEntriesState {
   reconcileTravelEntries: () => Promise<void>;
 
   // Queries
-  getTravelEntriesByDateRange: (start: number, end: number, projectIds?: number[], customerIds?: number[]) => TravelEntry[];
+  getTravelEntriesByDateRange: (start: number, end: number, projectIds?: number[], customerIds?: number[]) => Promise<TravelEntry[]>;
   getTotalDistance: (entries: TravelEntry[]) => { km: number; mile: number };
 }
 
@@ -133,7 +133,7 @@ export const useTravelEntriesStore = create<TravelEntriesState>((set, get) => ({
       let query = db.travelEntries.orderBy('date');
 
       if (filters?.startDate && filters?.endDate) {
-        query = query.filter(entry => 
+        query = query.filter(entry =>
           entry.date >= filters.startDate! && entry.date <= filters.endDate!
         );
       }
@@ -145,7 +145,25 @@ export const useTravelEntriesStore = create<TravelEntriesState>((set, get) => ({
       }
 
       if (filters?.customerIds && filters.customerIds.length > 0) {
-        entries = entries.filter(entry => filters.customerIds!.includes(entry.customerId));
+        // Need to match by both customerFirestoreId and customerId for backward compatibility
+        // First, get all customers to build a mapping
+        const customers = await db.customers.toArray();
+        const customerIdSet = new Set(filters.customerIds);
+
+        // Build a set of firestoreIds that correspond to the requested customerIds
+        const firestoreIdSet = new Set<string>();
+        customers.forEach(customer => {
+          if (customer.id && customerIdSet.has(customer.id) && customer.firestoreId) {
+            firestoreIdSet.add(customer.firestoreId);
+          }
+        });
+
+        entries = entries.filter(entry => {
+          // Match by local customerId OR by customerFirestoreId
+          const matchesLocalId = customerIdSet.has(entry.customerId);
+          const matchesFirestoreId = entry.customerFirestoreId && firestoreIdSet.has(entry.customerFirestoreId);
+          return matchesLocalId || matchesFirestoreId;
+        });
       }
 
       set({ travelEntries: entries, isLoading: false });
@@ -292,7 +310,7 @@ export const useTravelEntriesStore = create<TravelEntriesState>((set, get) => ({
     }
   },
 
-  getTravelEntriesByDateRange: (start, end, projectIds, customerIds) => {
+  getTravelEntriesByDateRange: async (start, end, projectIds, customerIds) => {
     let entries = get().travelEntries.filter(
       entry => entry.date >= start && entry.date <= end
     );
@@ -302,7 +320,25 @@ export const useTravelEntriesStore = create<TravelEntriesState>((set, get) => ({
     }
 
     if (customerIds && customerIds.length > 0) {
-      entries = entries.filter(entry => customerIds.includes(entry.customerId));
+      // Need to match by both customerFirestoreId and customerId for backward compatibility
+      // Get all customers to build a mapping
+      const customers = await db.customers.toArray();
+      const customerIdSet = new Set(customerIds);
+
+      // Build a set of firestoreIds that correspond to the requested customerIds
+      const firestoreIdSet = new Set<string>();
+      customers.forEach(customer => {
+        if (customer.id && customerIdSet.has(customer.id) && customer.firestoreId) {
+          firestoreIdSet.add(customer.firestoreId);
+        }
+      });
+
+      entries = entries.filter(entry => {
+        // Match by local customerId OR by customerFirestoreId
+        const matchesLocalId = customerIdSet.has(entry.customerId);
+        const matchesFirestoreId = entry.customerFirestoreId && firestoreIdSet.has(entry.customerFirestoreId);
+        return matchesLocalId || matchesFirestoreId;
+      });
     }
 
     return entries;
