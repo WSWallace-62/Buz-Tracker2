@@ -25,6 +25,8 @@ export function CustomerFormModal({ isOpen, onClose, customer }: CustomerFormMod
   const [contacts, setContacts] = useState<Contact[]>([{ name: '', email: '' }]);
   const [standardRate, setStandardRate] = useState('90');
   const [travelRate, setTravelRate] = useState('55');
+  const [distanceUnit, setDistanceUnit] = useState<'km' | 'mile'>('km');
+  const [perDiemRate, setPerDiemRate] = useState('0');
   const [currency, setCurrency] = useState('CAD');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -40,6 +42,8 @@ export function CustomerFormModal({ isOpen, onClose, customer }: CustomerFormMod
       setContacts(customer.contacts.length > 0 ? customer.contacts : [{ name: '', email: '' }]);
       setStandardRate(customer.standardRate.toString());
       setTravelRate(customer.travelRate.toString());
+      setDistanceUnit(customer.distanceUnit || 'km');
+      setPerDiemRate(customer.perDiemRate?.toString() || '0');
       setCurrency(customer.currency);
     } else {
       // Reset form for new customer
@@ -52,6 +56,8 @@ export function CustomerFormModal({ isOpen, onClose, customer }: CustomerFormMod
       setContacts([{ name: '', email: '' }]);
       setStandardRate('90');
       setTravelRate('55');
+      setDistanceUnit('km');
+      setPerDiemRate('0');
       setCurrency('CAD');
     }
   }, [customer, isOpen]);
@@ -96,11 +102,15 @@ export function CustomerFormModal({ isOpen, onClose, customer }: CustomerFormMod
     // Validate rates
     const stdRate = parseFloat(standardRate);
     const trvRate = parseFloat(travelRate);
+    const pdRate = parseFloat(perDiemRate);
     if (isNaN(stdRate) || stdRate < 0) {
       return 'Standard rate must be a positive number';
     }
     if (isNaN(trvRate) || trvRate < 0) {
       return 'Travel rate must be a positive number';
+    }
+    if (isNaN(pdRate) || pdRate < 0) {
+      return 'Per diem rate must be a positive number';
     }
 
     return null;
@@ -131,6 +141,8 @@ export function CustomerFormModal({ isOpen, onClose, customer }: CustomerFormMod
         contacts: validContacts,
         standardRate: parseFloat(standardRate),
         travelRate: parseFloat(travelRate),
+        distanceUnit,
+        perDiemRate: parseFloat(perDiemRate),
         currency,
         archived: customer?.archived || false,
       };
@@ -387,6 +399,37 @@ export function CustomerFormModal({ isOpen, onClose, customer }: CustomerFormMod
                   onChange={(e) => setTravelRate(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="55"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Travel Distance Unit
+                </label>
+                <select
+                  value={distanceUnit}
+                  onChange={(e) => setDistanceUnit(e.target.value as 'km' | 'mile')}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="km">Kilometers (km)</option>
+                  <option value="mile">Miles</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Per Diem Rate (per day)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={perDiemRate}
+                  onChange={(e) => setPerDiemRate(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="0"
                 />
               </div>
             </div>

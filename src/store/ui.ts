@@ -14,6 +14,7 @@ interface ToastState {
 interface UIState {
   isProjectManagerOpen: boolean
   isAddEntryModalOpen: boolean
+  isTravelDistanceModalOpen: boolean
   confirmDialog: {
     isOpen: boolean
     title: string
@@ -29,6 +30,8 @@ interface UIState {
   closeProjectManager: () => void
   openAddEntryModal: () => void
   closeAddEntryModal: () => void
+  openTravelDistanceModal: () => void
+  closeTravelDistanceModal: () => void
   showConfirm: (title: string, message: string, onConfirm: () => void, onCancel?: () => void, requireText?: string) => void
   hideConfirm: () => void
   showToast: (message: string, type?: 'success' | 'error' | 'info', action?: { label: string; onClick: () => void }) => void
@@ -40,6 +43,7 @@ interface UIState {
 export const useUIStore = create<UIState>((set, get) => ({
   isProjectManagerOpen: false,
   isAddEntryModalOpen: false,
+  isTravelDistanceModalOpen: false,
   confirmDialog: null,
   toasts: [],
   currentProjectId: null,
@@ -51,64 +55,68 @@ export const useUIStore = create<UIState>((set, get) => ({
   openAddEntryModal: () => set({ isAddEntryModalOpen: true }),
   closeAddEntryModal: () => set({ isAddEntryModalOpen: false }),
 
-  showConfirm: (title, message, onConfirm, onCancel, requireText) => {
-    set({
-      confirmDialog: {
+  // Travel distance modal controls
+  openTravelDistanceModal: () => set({ isTravelDistanceModalOpen: true }),
+closeTravelDistanceModal: () => set({ isTravelDistanceModalOpen: false }),
+  
+    showConfirm: (title, message, onConfirm, onCancel, requireText) => {
+      set({
+        confirmDialog: {
         isOpen: true,
         title,
         message,
         onConfirm,
         onCancel,
-        requireText
-      }
-    })
-  },
-
-  hideConfirm: () => set({ confirmDialog: null }),
-
-  showToast: (message, type = 'info', action) => {
+      requireText
+    }
+  })
+},
+  
+hideConfirm: () => set({ confirmDialog: null }),
+  
+    showToast: (message, type = 'info', action) => {
     const id = Math.random().toString(36).substring(2, 11);
-    const toast: ToastState = { id, message, type, action };
-
-    set(state => ({
-      toasts: [...state.toasts, toast]
-    }));
-
-    if (!action) {
-      setTimeout(() => {
-        get().removeToast(id);
-      }, 5000);
-    }
-  },
-
-  removeToast: (id) => {
-    set(state => ({
-      toasts: state.toasts.filter(t => t.id !== id)
-    }));
-  },
-
+const toast: ToastState = { id, message, type, action };
+    
+      set(state => ({
+    toasts: [...state.toasts, toast]
+}));
+    
+      if (!action) {
+        setTimeout(() => {
+      get().removeToast(id);
+    }, 5000);
+  }
+},
+  
+    removeToast: (id) => {
+      set(state => ({
+    toasts: state.toasts.filter(t => t.id !== id)
+  }));
+},
+  
   // FIX: Added the parameter types back
-  setCurrentProject: (projectId: number | null) => {
+    setCurrentProject: (projectId: number | null) => {
     set({ currentProjectId: projectId });
-    if (projectId) {
-      db.settings.toCollection().first().then(settings => {
-        if (settings) {
-          db.settings.update(settings.id!, { lastProjectId: projectId });
-        }
-      });
-    }
-  },
-
+      if (projectId) {
+        db.settings.toCollection().first().then(settings => {
+          if (settings) {
+        db.settings.update(settings.id!, { lastProjectId: projectId });
+      }
+    });
+  }
+},
+  
   // FIX: Added the parameter types back
-  setTheme: (theme: 'light' | 'dark') => {
+    setTheme: (theme: 'light' | 'dark') => {
     set({ theme });
     // Save to localStorage for persistence across logins/logouts
     localStorage.setItem('buztracker-theme', theme);
     // Also save to database for sync
-    db.settings.toCollection().first().then(settings => {
-      if (settings) {
-        db.settings.update(settings.id!, { theme });
-      }
-    });
-  }
+      db.settings.toCollection().first().then(settings => {
+        if (settings) {
+      db.settings.update(settings.id!, { theme });
+    }
+  });
+}
 }));
