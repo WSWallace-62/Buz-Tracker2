@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { db, TravelEntry } from '../db/dexie';
+import { db, type TravelEntry } from '../db/dexie';
 import { getAuth } from 'firebase/auth';
 import { useUIStore } from './ui';
 import {
@@ -13,6 +13,8 @@ import {
   Unsubscribe,
 } from 'firebase/firestore';
 import { db as firestoreDb } from '../firebase';
+
+export type { TravelEntry };
 
 // Keep track of the unsubscribe function
 let unsubscribeFromFirestore: Unsubscribe | null = null;
@@ -36,15 +38,7 @@ interface TravelEntriesState {
   createTravelEntry: (entry: Omit<TravelEntry, 'id' | 'createdAt' | 'firestoreId'>) => Promise<void>;
   updateTravelEntry: (id: number, updates: Partial<TravelEntry>) => Promise<void>;
   deleteTravelEntry: (id: number) => Promise<void>;
-
-  // Sync actions
-  startSync: () => void;
-  stopSync: () => void;
-  reconcileTravelEntries: () => Promise<void>;
-
-  // Queries
-  getTravelEntriesByDateRange: (start: number, end: number, projectIds?: number[], customerIds?: number[]) => Promise<TravelEntry[]>;
-  getTotalDistance: (entries: TravelEntry[]) => { km: number; mile: number };
+  subscribeToTravelEntries: () => Unsubscribe;
 }
 
 export const useTravelEntriesStore = create<TravelEntriesState>((set, get) => ({
@@ -264,6 +258,82 @@ export const useTravelEntriesStore = create<TravelEntriesState>((set, get) => ({
     }
   },
 
+
+
+  subscribeToTravelEntries: () => {
+    const auth = getAuth();
+    const user = auth.currentUser;
+    if (!user || !firestoreDb) {
+      console.log("User not logged in or firestore not available. Skipping travel entries sync.");
+      return () => {};
+    }
+
+    if (unsubscribeFromFirestore) {
+      console.log("Travel entries sync already active.");
+      return () => {};
+    }
+
+    set({ isSyncing: true });
+    console.log("Starting Firestore travel entries sync...");
+
+    const travelEntriesCollection = query(collection(firestoreDb, 'users', user.uid, 'travelEntries'));
+
+    unsubscribeFromFirestore = onSnapshot(travelEntriesCollection, async (snapshot) => {
+      set({ isLoading: true });
+      const changes = snapshot.docChanges();
+
+      await db.transaction('rw', db.travelEntries, async () => {
+        for (const change of changes) {
+          const firestoreData = change.doc.data();
+          const firestoreId = change.doc.id;
+
+          const existingEntry = await db.travelEntries.where('firestoreId').equals(firestoreId).first();
+
+          switch (change.type) {
+            case 'added':
+              if (recentlyAddedIds.has(firestoreId)) {
+                break;
+              }
+              if (!existingEntry) {
+                await db.travelEntries.add({
+                  ...firestoreData,
+                  firestoreId,
+                } as TravelEntry);
+              }
+              break;
+            case 'modified':
+              if (existingEntry?.id) {
+                await db.travelEntries.update(existingEntry.id, {
+                  ...firestoreData,
+                  firestoreId,
+                });
+              }
+              break;
+            case 'removed':
+              if (existingEntry?.id) {
+                await db.travelEntries.delete(existingEntry.id);
+              }
+              break;
+          }
+        }
+      });
+
+      await get().loadTravelEntries();
+    }, (error) => {
+      console.error("Error with Firestore travel entries snapshot listener:", error);
+      set({ error: "Failed to sync travel entries.", isSyncing: false });
+    });
+
+    return () => {
+      if (unsubscribeFromFirestore) {
+        console.log("Stopping Firestore travel entries sync.");
+        unsubscribeFromFirestore();
+        unsubscribeFromFirestore = null;
+      }
+      set({ isSyncing: false });
+    };
+  },
+
   reconcileTravelEntries: async () => {
     const user = getAuth().currentUser;
     if (!user || !firestoreDb) {
@@ -295,66 +365,17 @@ export const useTravelEntriesStore = create<TravelEntriesState>((set, get) => ({
               organizationId: entry.organizationId,
             }
           );
-
+          // Update local entry with the new Firestore ID
           if (entry.id) {
             await db.travelEntries.update(entry.id, { firestoreId: docRef.id });
           }
-        } catch (error) {
-          console.error(`Failed to reconcile travel entry ${entry.id}:`, error);
+        } catch (firestoreError) {
+          console.error(`Failed to reconcile travel entry ${entry.id}:`, firestoreError);
         }
       }
-
-      console.log("Travel entries reconciliation complete.");
     } catch (error) {
-      console.error("Failed to reconcile travel entries:", error);
+      console.error("Error during travel entry reconciliation:", error);
     }
-  },
-
-  getTravelEntriesByDateRange: async (start, end, projectIds, customerIds) => {
-    let entries = get().travelEntries.filter(
-      entry => entry.date >= start && entry.date <= end
-    );
-
-    if (projectIds && projectIds.length > 0) {
-      entries = entries.filter(entry => projectIds.includes(entry.projectId));
-    }
-
-    if (customerIds && customerIds.length > 0) {
-      // Need to match by both customerFirestoreId and customerId for backward compatibility
-      // Get all customers to build a mapping
-      const customers = await db.customers.toArray();
-      const customerIdSet = new Set(customerIds);
-
-      // Build a set of firestoreIds that correspond to the requested customerIds
-      const firestoreIdSet = new Set<string>();
-      customers.forEach(customer => {
-        if (customer.id && customerIdSet.has(customer.id) && customer.firestoreId) {
-          firestoreIdSet.add(customer.firestoreId);
-        }
-      });
-
-      entries = entries.filter(entry => {
-        // Match by local customerId OR by customerFirestoreId
-        const matchesLocalId = customerIdSet.has(entry.customerId);
-        const matchesFirestoreId = entry.customerFirestoreId && firestoreIdSet.has(entry.customerFirestoreId);
-        return matchesLocalId || matchesFirestoreId;
-      });
-    }
-
-    return entries;
-  },
-
-  getTotalDistance: (entries) => {
-    return entries.reduce(
-      (acc, entry) => {
-        if (entry.unit === 'km') {
-          acc.km += entry.distance;
-        } else {
-          acc.mile += entry.distance;
-        }
-        return acc;
-      },
-      { km: 0, mile: 0 }
-    );
   },
 }));
+

@@ -24,42 +24,11 @@ service cloud.firestore {
 
     // Users can only read and write their own data
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, update, delete: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null;
 
-      // Allow users to manage their own projects and sessions
-      match /projects/{projectId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-      }
-
-      match /sessions/{sessionId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-      }
-
-      match /customers/{customerId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-      }
-
-      match /predefinedNotes/{noteId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-      }
-
-      match /travelEntries/{entryId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-      }
-
-      // Allow users to manage their own FCM tokens for push notifications
-      match /fcmTokens/{tokenId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-      }
-
-      // Allow users to manage their own running session status
-      // This document is specifically for runningSession
-      match /status/runningSession {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-      }
-
-      // Allow users to manage their own configuration settings
-      match /config/settings {
+      // Allow users to manage their own subcollections
+      match /{subcollection}/{docId} {
         allow read, write: if request.auth != null && request.auth.uid == userId;
       }
     }
