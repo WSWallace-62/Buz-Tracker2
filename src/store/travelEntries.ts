@@ -13,6 +13,7 @@ import {
   Unsubscribe,
 } from 'firebase/firestore';
 import { db as firestoreDb } from '../firebase';
+import { useProjectsStore } from './projects';
 
 export type { TravelEntry };
 
@@ -73,7 +74,6 @@ export const useTravelEntriesStore = create<TravelEntriesState>((set, get) => ({
 
       await db.transaction('rw', db.travelEntries, async () => {
         // Get projects to convert Firestore project IDs to local IDs
-        const { useProjectsStore } = await import('./projects');
         const projects = useProjectsStore.getState().projects;
         
         for (const change of changes) {
@@ -202,7 +202,6 @@ export const useTravelEntriesStore = create<TravelEntriesState>((set, get) => ({
       if (user && firestoreDb) {
         try {
           // Convert local projectId to Firestore projectId before syncing
-          const { useProjectsStore } = await import('./projects');
           const projects = useProjectsStore.getState().projects;
           const project = projects.find(p => p.id === entryData.projectId);
           
@@ -408,4 +407,3 @@ export const useTravelEntriesStore = create<TravelEntriesState>((set, get) => ({
     }
   },
 }));
-
