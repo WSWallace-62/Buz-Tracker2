@@ -1,4 +1,4 @@
- // src/App.tsx
+// src/App.tsx
 import { useEffect, useState, lazy, Suspense, useCallback, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
@@ -14,15 +14,14 @@ import { auth } from './firebase';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { ProjectSelect } from './components/ProjectSelect';
 import { Stopwatch } from './components/Stopwatch';
-import { SessionsTable } from './components/SessionsTable';
 import { Toast } from './components/Toast';
 import { InstallButton } from './pwa/InstallButton';
 import { UserMenu } from './components/UserMenu';
-import { getTotalDuration, formatDuration } from './utils/time';
+import { formatDuration } from './utils/time';
 import { audioManager } from './utils/audioManager';
 import './styles.css';
 
-// Lazy load all non-critical/route-specific components
+ // Lazy load all non-critical/route-specific components
 const HistoryPanel = lazy(() => import('./components/HistoryPanel').then(module => ({ default: module.HistoryPanel })));
 const SettingsPage = lazy(() => import('./pages/SettingsPage').then(module => ({ default: module.SettingsPage })));
 const ProfilePage = lazy(() => import('./pages/ProfilePage').then(module => ({ default: module.ProfilePage })));
@@ -31,8 +30,10 @@ const CorporatePage = lazy(() => import('./pages/CorporatePage').then(module => 
 const FAQPage = lazy(() => import('./pages/FAQPage').then(module => ({ default: module.FAQPage })));
 const Auth = lazy(() => import('./components/Auth').then(module => ({ default: module.Auth })));
 const AddEntryModal = lazy(() => import('./components/AddEntryModal').then(module => ({ default: module.AddEntryModal })));
+const AddTravelDistanceModal = lazy(() => import('./components/AddTravelDistanceModal').then(module => ({ default: module.AddTravelDistanceModal })));
 const ProjectManagerModal = lazy(() => import('./components/ProjectManagerModal').then(module => ({ default: module.ProjectManagerModal })));
 const ConfirmDialog = lazy(() => import('./components/ConfirmDialog').then(module => ({ default: module.ConfirmDialog })));
+const TodaysActivity = lazy(() => import('./components/TodaysActivity'));
 
 type Tab = 'tracker' | 'history' | 'settings' | 'profile' | 'customers' | 'corporate' | 'faq';
 
@@ -47,11 +48,11 @@ export function App() {
 function AppContent() {
   const isOnline = useOnlineStatus();
   const { reconcileProjects, startProjectSync, stopProjectSync } = useProjectsStore();
-  const { getTodaySessions, startSync, stopSync, reconcileSessions } = useSessionsStore();
+  const { startSync, stopSync, reconcileSessions } = useSessionsStore();
   const { startPredefinedNotesSync, stopPredefinedNotesSync } = usePredefinedNotesStore();
   const { startCustomerSync, stopCustomerSync, loadCustomers } = useCustomersStore();
   const { startOrganizationSync, stopOrganizationSync, loadOrganization } = useOrganizationStore();
-  const { currentProjectId, setCurrentProject, openAddEntryModal, theme, setTheme } = useUIStore();
+  const { currentProjectId, setCurrentProject, openAddEntryModal, openTravelDistanceModal, theme, setTheme } = useUIStore();
   const { user, setUserAndOrg, isLoading: isAuthLoading } = useAuthStore();
   const [isGuest, setIsGuest] = useState(false);
   const location = useLocation();
@@ -211,9 +212,6 @@ function AppContent() {
     );
   }
 
-  const todaySessions = getTodaySessions(currentProjectId || undefined);
-  const todayTotal = getTotalDuration(todaySessions);
-
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <a href="#main-content" className="skip-link">Skip to main content</a>
@@ -269,7 +267,7 @@ function AppContent() {
             </div>
             <div className="flex items-center py-4" aria-label="Application version">
               <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Rev</span>
-              <span className="ml-1 text-sm font-semibold text-gray-500 dark:text-gray-300">2.9</span>
+              <span className="ml-1 text-sm font-semibold text-gray-500 dark:text-gray-300">3.0</span>
             </div>
           </div>
         </div>
@@ -296,8 +294,12 @@ function AppContent() {
                     <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
                     Add Session
                   </button>
+                  <button onClick={openTravelDistanceModal} className="btn-secondary flex items-center" title="Add travel distance entry">
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" /></svg>
+                    Add Travel Distance
+                  </button>
                 </div>
-                <SessionsTable projectId={currentProjectId || undefined} todayTotal={todayTotal} />
+                <TodaysActivity />
               </div>
             } />
             <Route path="/customers" element={<CustomersPage />} />
@@ -314,6 +316,7 @@ function AppContent() {
 
       <Suspense fallback={null}>
         <AddEntryModal />
+        <AddTravelDistanceModal />
         <ProjectManagerModal />
         <ConfirmDialog />
       </Suspense>

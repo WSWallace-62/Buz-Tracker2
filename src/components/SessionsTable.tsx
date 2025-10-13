@@ -37,6 +37,17 @@ export function SessionsTable({ projectId, showAllProjects = false, sessions: ex
     return project?.color || '#6b7280'
   }
 
+  const getCustomerName = (projectId: number) => {
+    const project = projects.find(p => p.id === projectId);
+    if (!project) return 'N/A';
+
+    const customer = customers.find(c => 
+      (project.customerId && c.id === project.customerId) || 
+      (project.customerFirestoreId && c.firestoreId === project.customerFirestoreId)
+    );
+    return customer?.companyName || 'N/A';
+  };
+
   const handleEdit = (session: Session) => {
     setEditingSession(session)
   }
@@ -160,9 +171,14 @@ export function SessionsTable({ projectId, showAllProjects = false, sessions: ex
                 Duration
               </th>
               {showAllProjects && (
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Project
-                </th>
+                <>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    Customer
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    Project
+                  </th>
+                </>
               )}
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                 Note
@@ -184,15 +200,20 @@ export function SessionsTable({ projectId, showAllProjects = false, sessions: ex
                   {formatDurationHHMM(session.durationMs)}
                 </td>
                 {showAllProjects && (
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                    <div className="flex items-center">
-                      <div
-                        className="w-3 h-3 rounded-full mr-2 flex-shrink-0"
-                        style={{ backgroundColor: getProjectColor(session.projectId) }}
-                      />
-                      {getProjectName(session.projectId)}
-                    </div>
-                  </td>
+                  <>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                      {getCustomerName(session.projectId)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                      <div className="flex items-center">
+                        <div
+                          className="w-3 h-3 rounded-full mr-2 flex-shrink-0"
+                          style={{ backgroundColor: getProjectColor(session.projectId) }}
+                        />
+                        {getProjectName(session.projectId)}
+                      </div>
+                    </td>
+                  </>
                 )}
                 <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100 max-w-xs">
                   <div className="truncate" title={session.note}>

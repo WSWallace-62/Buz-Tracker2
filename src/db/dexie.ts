@@ -16,6 +16,8 @@ export interface Customer {
   contacts: Contact[]
   standardRate: number
   travelRate: number
+  distanceUnit: 'km' | 'mile'
+  perDiemRate: number
   currency: string
   createdAt: number
   archived: boolean
@@ -76,6 +78,21 @@ export interface PredefinedNote {
   firestoreId?: string
 }
 
+export interface TravelEntry {
+  id?: number
+  projectId: number
+  customerId: number
+  customerFirestoreId?: string
+  date: number
+  distance: number
+  unit: 'km' | 'mile'
+  note?: string
+  createdAt: number
+  firestoreId?: string
+  userId?: string
+  organizationId?: string
+}
+
 // New: Organization and CorporateInfo types
 export interface CorporateInfo {
   companyName: string
@@ -116,9 +133,23 @@ export class BuzTrackerDB extends Dexie {
   customers!: Table<Customer>
   organizations!: Table<Organization>
   users!: Table<User>
+  travelEntries!: Table<TravelEntry>
 
   constructor() {
     super('BuzTrackerDB')
+
+    // Bump DB version to 616 to add travelEntries table
+    this.version(616).stores({
+      projects: '++id, firestoreId, name, createdAt, archived, customerId, customerFirestoreId',
+      sessions: '++id, projectId, firestoreId, start, stop, createdAt, *note',
+      settings: '++id',
+      runningSession: '++id, running, projectId, startTs, isPaused, continuedFromSessionId',
+      predefinedNotes: '++id, firestoreId, note, createdAt',
+      customers: '++id, firestoreId, companyName, createdAt, archived',
+      organizations: '++id, firestoreId, createdBy, createdAt, updatedAt',
+      users: '++id, userId, organizationId, role, updatedAt',
+      travelEntries: '++id, firestoreId, projectId, customerId, customerFirestoreId, date, createdAt'
+    })
 
     // Bump DB version to 615 to add organizations and users tables
     this.version(615).stores({
@@ -171,7 +202,7 @@ export class BuzTrackerDB extends Dexie {
   }
 
   async initializeDatabase() {
-    await this.transaction('rw', this.projects, this.settings, this.predefinedNotes, this.customers, async () => {
+    await this.transaction('rw', this.projects, this.settings, this.predefinedNotes, this.customers, this.travelEntries, async () => {
       // Initialize default settings
       const settingsCount = await this.settings.count();
       if (settingsCount === 0) {
@@ -200,6 +231,8 @@ export class BuzTrackerDB extends Dexie {
           ],
           standardRate: 90,
           travelRate: 55,
+          distanceUnit: 'km',
+          perDiemRate: 0,
           currency: 'CAD',
           createdAt: Date.now(),
           archived: false
@@ -266,7 +299,8 @@ export async function clearDatabase() {
     db.predefinedNotes.clear(),
     db.customers.clear(),
     db.organizations.clear(),
-    db.users.clear()
+    db.users.clear(),
+    db.travelEntries.clear()
   ]);
 }
 

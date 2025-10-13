@@ -156,6 +156,16 @@ export function CustomerCard({ customer, onEdit }: CustomerCardProps) {
           <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300">
             {formatRate(customer.travelRate, customer.currency)} travel
           </span>
+
+          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-teal-100 dark:bg-teal-900/30 text-teal-800 dark:text-teal-300">
+            {formatRate(customer.travelRate, customer.currency)}/{customer.distanceUnit || 'km'}
+          </span>
+
+          {customer.perDiemRate > 0 && (
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300">
+              {formatRate(customer.perDiemRate, customer.currency)}/day
+            </span>
+          )}
         </div>
 
         {/* Expand/Collapse Button */}
