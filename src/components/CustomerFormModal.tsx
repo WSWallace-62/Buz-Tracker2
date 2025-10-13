@@ -25,7 +25,8 @@ export function CustomerFormModal({ isOpen, onClose, customer }: CustomerFormMod
   const [contacts, setContacts] = useState<Contact[]>([{ name: '', email: '' }]);
   const [standardRate, setStandardRate] = useState('90');
   const [travelRate, setTravelRate] = useState('55');
-  const [distanceUnit, setDistanceUnit] = useState<'km' | 'mile'>('km');
+  const [distanceUnit, setDistanceUnit] = useState<'km' | 'miles'>('km');
+  const [distanceRate, setDistanceRate] = useState('0.7');
   const [perDiemRate, setPerDiemRate] = useState('0');
   const [currency, setCurrency] = useState('CAD');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -41,10 +42,11 @@ export function CustomerFormModal({ isOpen, onClose, customer }: CustomerFormMod
       setCountry(customer.country);
       setContacts(customer.contacts.length > 0 ? customer.contacts : [{ name: '', email: '' }]);
       setStandardRate(customer.standardRate.toString());
-      setTravelRate(customer.travelRate.toString());
-      setDistanceUnit(customer.distanceUnit || 'km');
+      setTravelRate(customer.travelRate?.toString() || '55');
+      setDistanceUnit(customer.travelDistanceUnit || 'km');
+      setDistanceRate(customer.distanceRate?.toString() || '0.7');
       setPerDiemRate(customer.perDiemRate?.toString() || '0');
-      setCurrency(customer.currency);
+      setCurrency(customer.currency || 'CAD');
     } else {
       // Reset form for new customer
       setCompanyName('');
@@ -57,6 +59,7 @@ export function CustomerFormModal({ isOpen, onClose, customer }: CustomerFormMod
       setStandardRate('90');
       setTravelRate('55');
       setDistanceUnit('km');
+      setDistanceRate('0.7');
       setPerDiemRate('0');
       setCurrency('CAD');
     }
@@ -102,12 +105,16 @@ export function CustomerFormModal({ isOpen, onClose, customer }: CustomerFormMod
     // Validate rates
     const stdRate = parseFloat(standardRate);
     const trvRate = parseFloat(travelRate);
+    const distRate = parseFloat(distanceRate);
     const pdRate = parseFloat(perDiemRate);
     if (isNaN(stdRate) || stdRate < 0) {
       return 'Standard rate must be a positive number';
     }
     if (isNaN(trvRate) || trvRate < 0) {
       return 'Travel rate must be a positive number';
+    }
+    if (isNaN(distRate) || distRate < 0) {
+      return 'Distance rate must be a positive number';
     }
     if (isNaN(pdRate) || pdRate < 0) {
       return 'Per diem rate must be a positive number';
@@ -141,7 +148,8 @@ export function CustomerFormModal({ isOpen, onClose, customer }: CustomerFormMod
         contacts: validContacts,
         standardRate: parseFloat(standardRate),
         travelRate: parseFloat(travelRate),
-        distanceUnit,
+        travelDistanceUnit: distanceUnit,
+        distanceRate: parseFloat(distanceRate),
         perDiemRate: parseFloat(perDiemRate),
         currency,
         archived: customer?.archived || false,
@@ -410,28 +418,43 @@ export function CustomerFormModal({ isOpen, onClose, customer }: CustomerFormMod
                 </label>
                 <select
                   value={distanceUnit}
-                  onChange={(e) => setDistanceUnit(e.target.value as 'km' | 'mile')}
+                  onChange={(e) => setDistanceUnit(e.target.value as 'km' | 'miles')}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="km">Kilometers (km)</option>
-                  <option value="mile">Miles</option>
+                  <option value="miles">Miles</option>
                 </select>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Per Diem Rate (per day)
+                  Distance Rate
                 </label>
                 <input
                   type="number"
                   step="0.01"
                   min="0"
-                  value={perDiemRate}
-                  onChange={(e) => setPerDiemRate(e.target.value)}
+                  value={distanceRate}
+                  onChange={(e) => setDistanceRate(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="0"
+                  placeholder="e.g., 0.55"
                 />
               </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Per Diem Rate (per day)
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={perDiemRate}
+                onChange={(e) => setPerDiemRate(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="0"
+              />
             </div>
           </div>
 

@@ -29,8 +29,8 @@ const TodaysActivity: React.FC = () => {
     );
   }
 
-  const todaysSessions = sessions.filter(s => s.projectId === currentProjectId);
-  const todaysTravel = travelEntries.filter(t => t.projectId === currentProjectId);
+  const todaysSessions = sessions;
+  const todaysTravel = travelEntries;
 
   return (
     <div className="mt-4">

@@ -15,10 +15,11 @@ export interface Customer {
   country: string
   contacts: Contact[]
   standardRate: number
-  travelRate: number
-  distanceUnit: 'km' | 'mile'
-  perDiemRate: number
-  currency: string
+  travelRate?: number;
+  travelDistanceUnit?: 'km' | 'miles';
+  distanceRate?: number;
+  perDiemRate?: number
+  currency?: string
   createdAt: number
   archived: boolean
   firestoreId?: string
@@ -85,7 +86,7 @@ export interface TravelEntry {
   customerFirestoreId?: string
   date: number
   distance: number
-  unit: 'km' | 'mile'
+  unit: 'km' | 'miles'
   note?: string
   createdAt: number
   firestoreId?: string
@@ -231,7 +232,7 @@ export class BuzTrackerDB extends Dexie {
           ],
           standardRate: 90,
           travelRate: 55,
-          distanceUnit: 'km',
+          travelDistanceUnit: 'km',
           perDiemRate: 0,
           currency: 'CAD',
           createdAt: Date.now(),
