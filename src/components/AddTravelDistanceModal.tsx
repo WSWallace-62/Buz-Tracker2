@@ -19,7 +19,7 @@ export function AddTravelDistanceModal() {
     note: '',
   });
 
-  const [unit, setUnit] = useState<'km' | 'mile'>('km');
+  const [unit, setUnit] = useState<'km' | 'miles'>('km');
 
   // Get the current project
   const currentProject = useMemo(
@@ -75,7 +75,7 @@ export function AddTravelDistanceModal() {
 
         // Set unit from customer if available
         if (projectCustomer) {
-          setUnit(projectCustomer.distanceUnit || 'km');
+          setUnit(projectCustomer.travelDistanceUnit || 'km');
         }
       } else {
         // No current project, reset to empty
@@ -239,7 +239,7 @@ export function AddTravelDistanceModal() {
               />
               {selectedCustomer && (
                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  Rate: {selectedCustomer.currency} {selectedCustomer.travelRate.toFixed(2)}/{unit}
+                  Rate: {selectedCustomer.currency} {selectedCustomer.distanceRate?.toFixed(2)}/{unit}
                 </p>
               )}
             </div>

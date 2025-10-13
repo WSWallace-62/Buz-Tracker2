@@ -9,6 +9,7 @@ import { useAuthStore } from './store/auth';
 import { usePredefinedNotesStore } from './store/predefinedNotes';
 import { useCustomersStore } from './store/customers';
 import { useOrganizationStore } from './store/organization';
+import { useTravelEntriesStore } from './store/travelEntries';
 import { db, clearDatabase } from './db/dexie';
 import { auth } from './firebase';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
@@ -52,6 +53,7 @@ function AppContent() {
   const { startPredefinedNotesSync, stopPredefinedNotesSync } = usePredefinedNotesStore();
   const { startCustomerSync, stopCustomerSync, loadCustomers } = useCustomersStore();
   const { startOrganizationSync, stopOrganizationSync, loadOrganization } = useOrganizationStore();
+  const { startSync: startTravelEntriesSync, stopSync: stopTravelEntriesSync } = useTravelEntriesStore();
   const { currentProjectId, setCurrentProject, openAddEntryModal, openTravelDistanceModal, theme, setTheme } = useUIStore();
   const { user, setUserAndOrg, isLoading: isAuthLoading } = useAuthStore();
   const [isGuest, setIsGuest] = useState(false);
@@ -100,6 +102,7 @@ function AppContent() {
       startSync();
       startPredefinedNotesSync();
       startCustomerSync();
+      startTravelEntriesSync();
       await startOrganizationSync();
     } else if (isGuest) {
       await loadSessions();
@@ -112,7 +115,7 @@ function AppContent() {
     if (lastProject?.lastProjectId) {
       setCurrentProject(lastProject.lastProjectId);
     }
-  }, [isGuest, setUserAndOrg, reconcileProjects, reconcileSessions, loadSessions, loadRunningSession, startSync, setCurrentProject, startProjectSync, startPredefinedNotesSync, startCustomerSync, startOrganizationSync, loadCustomers, loadOrganization]);
+  }, [isGuest, setUserAndOrg, reconcileProjects, reconcileSessions, loadSessions, loadRunningSession, startSync, setCurrentProject, startProjectSync, startPredefinedNotesSync, startCustomerSync, startTravelEntriesSync, startOrganizationSync, loadCustomers, loadOrganization]);
 
   useEffect(() => {
     // onAuthStateChanged returns an unsubscribe function that we can use for cleanup.
@@ -123,8 +126,9 @@ function AppContent() {
       stopProjectSync();
       stopSync();
       stopPredefinedNotesSync();
+      stopTravelEntriesSync();
     };
-  }, [initializeApp, stopProjectSync, stopSync, stopPredefinedNotesSync]);
+  }, [initializeApp, stopProjectSync, stopSync, stopPredefinedNotesSync, stopTravelEntriesSync]);
 
   useEffect(() => {
     const defaultTitle = "BuzTracker - Time Tracker";
@@ -267,7 +271,7 @@ function AppContent() {
             </div>
             <div className="flex items-center py-4" aria-label="Application version">
               <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Rev</span>
-              <span className="ml-1 text-sm font-semibold text-gray-500 dark:text-gray-300">3.0</span>
+              <span className="ml-1 text-sm font-semibold text-gray-500 dark:text-gray-300">3.1</span>
             </div>
           </div>
         </div>

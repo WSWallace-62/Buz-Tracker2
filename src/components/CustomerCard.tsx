@@ -150,20 +150,20 @@ export function CustomerCard({ customer, onEdit }: CustomerCardProps) {
           </span>
 
           <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300">
-            {formatRate(customer.standardRate, customer.currency)} standard
+            {formatRate(customer.standardRate, customer.currency || 'CAD')} standard
           </span>
 
           <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300">
-            {formatRate(customer.travelRate, customer.currency)} travel
+            {formatRate(customer.travelRate || 0, customer.currency || 'CAD')} travel
           </span>
 
           <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-teal-100 dark:bg-teal-900/30 text-teal-800 dark:text-teal-300">
-            {formatRate(customer.travelRate, customer.currency)}/{customer.distanceUnit || 'km'}
+            {formatRate(customer.distanceRate || 0, customer.currency || 'CAD')}/{customer.travelDistanceUnit || 'km'}
           </span>
 
-          {customer.perDiemRate > 0 && (
+          {(customer.perDiemRate || 0) > 0 && (
             <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300">
-              {formatRate(customer.perDiemRate, customer.currency)}/day
+              {formatRate(customer.perDiemRate || 0, customer.currency || 'CAD')}/day
             </span>
           )}
         </div>

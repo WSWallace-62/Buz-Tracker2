@@ -17,13 +17,53 @@ const TravelLog: React.FC<TravelLogProps> = ({ sessions }) => {
   const [editingEntry, setEditingEntry] = useState<TravelEntry | null>(null);
 
   useEffect(() => {
+    if (sessions && sessions.length > 0) {
+      console.log('🚗 TravelLog displaying', sessions.length, 'travel entries');
+    } else {
+      console.log('🚗 TravelLog: No travel entries to display');
+    }
+  }, [sessions]);
+
+  useEffect(() => {
     loadCustomers();
     loadProjects();
   }, [loadCustomers, loadProjects]);
 
+  useEffect(() => {
+    if (projects.length > 0) {
+      console.log('📋 Current projects in TravelLog:', projects.map(p => ({ 
+        id: p.id, 
+        firestoreId: p.firestoreId, 
+        name: p.name,
+        customerId: p.customerId,
+        customerFirestoreId: p.customerFirestoreId
+      })));
+    }
+  }, [projects]);
+
   const getProjectColor = (projectId: number) => {
     const project = projects.find(p => p.id === projectId);
     return project?.color || '#6b7280'; // Default gray if no color
+  };
+
+  const getProjectName = (projectId: number) => {
+    const project = projects.find(p => p.id === projectId);
+    if (!project) {
+      // Debug: show the projectId that couldn't be found
+      return `Unknown Project (ID: ${projectId})`;
+    }
+    return project.name;
+  };
+
+  const getCustomerName = (projectId: number) => {
+    const project = projects.find(p => p.id === projectId);
+    if (!project) return 'N/A';
+
+    const customer = customers.find(c =>
+      (project.customerId && c.id === project.customerId) ||
+      (project.customerFirestoreId && c.firestoreId === project.customerFirestoreId)
+    );
+    return customer?.companyName || 'N/A';
   };
 
   const handleEdit = (entry: TravelEntry) => {
@@ -62,23 +102,26 @@ const TravelLog: React.FC<TravelLogProps> = ({ sessions }) => {
             </tr>
           </thead>
           <tbody>
-            {sessions.map(entry => {
-              const customer = customers.find(c => c.id === entry.customerId || c.firestoreId === entry.customerFirestoreId);
-              const project = projects.find(p => p.id === entry.projectId);
-              return (
-                <tr key={entry.id} className="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+            {sessions.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                  No travel entries found for the selected date range and filters.
+                </td>
+              </tr>
+            ) : (
+              sessions.map(entry => {
+                return (
+                  <tr key={entry.id} className="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
                   <td className="px-6 py-4">{new Date(entry.date).toLocaleDateString()}</td>
                   <td className="px-6 py-4">{entry.distance} {entry.unit}</td>
-                  <td className="px-6 py-4">{customer?.companyName || 'N/A'}</td>
+                  <td className="px-6 py-4">{getCustomerName(entry.projectId)}</td>
                   <td className="px-6 py-4">
                     <div className="flex items-center">
-                      {project && (
-                        <div
-                          className="w-3 h-3 rounded-full mr-2 flex-shrink-0"
-                          style={{ backgroundColor: getProjectColor(project.id!) }}
-                        />
-                      )}
-                      {project?.name || 'N/A'}
+                      <div
+                        className="w-3 h-3 rounded-full mr-2 flex-shrink-0"
+                        style={{ backgroundColor: getProjectColor(entry.projectId) }}
+                      />
+                      {getProjectName(entry.projectId)}
                     </div>
                   </td>
                   <td className="px-6 py-4">{entry.note}</td>
@@ -99,7 +142,8 @@ const TravelLog: React.FC<TravelLogProps> = ({ sessions }) => {
                   </td>
                 </tr>
               );
-            })}
+            })
+            )}
           </tbody>
         </table>
       </div>

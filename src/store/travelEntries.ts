@@ -39,6 +39,8 @@ interface TravelEntriesState {
   updateTravelEntry: (id: number, updates: Partial<TravelEntry>) => Promise<void>;
   deleteTravelEntry: (id: number) => Promise<void>;
   subscribeToTravelEntries: () => Unsubscribe;
+  startSync: () => void;
+  stopSync: () => void;
 }
 
 export const useTravelEntriesStore = create<TravelEntriesState>((set, get) => ({
@@ -70,9 +72,25 @@ export const useTravelEntriesStore = create<TravelEntriesState>((set, get) => ({
       const changes = snapshot.docChanges();
 
       await db.transaction('rw', db.travelEntries, async () => {
+        // Get projects to convert Firestore project IDs to local IDs
+        const { useProjectsStore } = await import('./projects');
+        const projects = useProjectsStore.getState().projects;
+        
         for (const change of changes) {
           const firestoreData = change.doc.data();
           const firestoreId = change.doc.id;
+
+          // Convert Firestore projectId to local projectId
+          const firestoreProjectId = firestoreData.projectId;
+          let localProjectId = firestoreProjectId;
+          
+          // Check if projectId is a Firestore ID (string) and convert to local ID
+          if (typeof firestoreProjectId === 'string') {
+            const project = projects.find(p => p.firestoreId === firestoreProjectId);
+            if (project?.id) {
+              localProjectId = project.id;
+            }
+          }
 
           const existingEntry = await db.travelEntries.where('firestoreId').equals(firestoreId).first();
 
@@ -84,6 +102,7 @@ export const useTravelEntriesStore = create<TravelEntriesState>((set, get) => ({
               if (!existingEntry) {
                 await db.travelEntries.add({
                   ...firestoreData,
+                  projectId: localProjectId,
                   firestoreId,
                 } as TravelEntry);
               }
@@ -92,6 +111,7 @@ export const useTravelEntriesStore = create<TravelEntriesState>((set, get) => ({
               if (existingEntry?.id) {
                 await db.travelEntries.update(existingEntry.id, {
                   ...firestoreData,
+                  projectId: localProjectId,
                   firestoreId,
                 });
               }
@@ -181,9 +201,19 @@ export const useTravelEntriesStore = create<TravelEntriesState>((set, get) => ({
 
       if (user && firestoreDb) {
         try {
+          // Convert local projectId to Firestore projectId before syncing
+          const { useProjectsStore } = await import('./projects');
+          const projects = useProjectsStore.getState().projects;
+          const project = projects.find(p => p.id === entryData.projectId);
+          
+          const entryForFirestore = {
+            ...newEntry,
+            projectId: project?.firestoreId || entryData.projectId, // Use Firestore ID if available
+          };
+          
           const docRef = await addDoc(
             collection(firestoreDb, 'users', user.uid, 'travelEntries'),
-            newEntry
+            entryForFirestore
           );
 
           recentlyAddedIds.add(docRef.id);
