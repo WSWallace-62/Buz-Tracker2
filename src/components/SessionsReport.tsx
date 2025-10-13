@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Session, Project } from '../db/dexie';
+import { Session, Project, TravelEntry } from '../db/dexie';
 import { formatDurationHours, formatDate, getTotalDuration } from '../utils/time';
 import { useCustomersStore } from '../store/customers';
 import { useOrganizationStore } from '../store/organization';
@@ -9,13 +9,14 @@ import { doc, getDoc } from 'firebase/firestore';
 interface SessionsReportProps {
   project: Project | null;
   sessions: Session[];
+  travelEntries?: TravelEntry[];
   dateRange: { start: string; end: string };
   logoUrl?: string; // Optional: For your business logo
   projects: Project[];
   theme?: 'light' | 'dark'; // Add theme prop
 }
 
-export function SessionsReport({ project, sessions, dateRange, logoUrl, projects, theme = 'light' }: SessionsReportProps) {
+export function SessionsReport({ project, sessions, travelEntries = [], dateRange, logoUrl, projects, theme = 'light' }: SessionsReportProps) {
   // Stores
   const { customers } = useCustomersStore();
   const { organization } = useOrganizationStore();
@@ -80,6 +81,21 @@ export function SessionsReport({ project, sessions, dateRange, logoUrl, projects
   // Calculate total duration for travel sessions
   const travelTotalMs = getTotalDuration(travelSessions);
   const travelTotalHours = parseFloat(formatDurationHours(travelTotalMs)).toFixed(2);
+
+  // Group travel entries by unit and calculate totals
+  const distanceTotals = useMemo(() => {
+    console.log('📊 Calculating distanceTotals from travelEntries:', travelEntries);
+    const totals = travelEntries.reduce((acc, entry) => {
+      const unit = entry.unit || 'km';
+      if (!acc[unit]) {
+        acc[unit] = 0;
+      }
+      acc[unit] += entry.distance;
+      return acc;
+    }, {} as Record<string, number>);
+    console.log('📊 Distance totals:', totals);
+    return totals;
+  }, [travelEntries]);
 
   const getProjectName = (projectId: number) => {
     const project = projects.find(p => p.id === projectId);
@@ -187,6 +203,36 @@ export function SessionsReport({ project, sessions, dateRange, logoUrl, projects
         </div>
       </header>
 
+      {/* Summary Section */}
+      <div className={`mb-6 p-4 ${bgClass} border ${borderClass} rounded-lg print:border-gray-300`}>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <p className={`text-sm font-semibold ${subTextClass} print:text-gray-600`}>Regular Hours</p>
+            <p className={`text-2xl font-bold ${headerTextClass} print:text-gray-900`}>{regularTotalHours}</p>
+          </div>
+          {travelSessions.length > 0 && (
+            <div>
+              <p className={`text-sm font-semibold ${subTextClass} print:text-gray-600`}>Travel Hours</p>
+              <p className={`text-2xl font-bold ${headerTextClass} print:text-gray-900`}>{travelTotalHours}</p>
+            </div>
+          )}
+        </div>
+        {Object.keys(distanceTotals).length > 0 && (
+          <div className={`mt-3 pt-3 border-t ${borderLightClass} print:border-gray-200`}>
+            <p className={`text-sm font-semibold ${subTextClass} mb-2 print:text-gray-600`}>Travel Distance</p>
+            <div className="flex gap-4 flex-wrap">
+              {Object.entries(distanceTotals).map(([unit, total]) => (
+                <div key={unit}>
+                  <span className={`text-xl font-bold ${headerTextClass} print:text-gray-900`}>
+                    {total.toFixed(1)} {unit}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Regular Sessions Table */}
       <main>
         <table className="w-full text-left border-collapse">
@@ -241,7 +287,7 @@ export function SessionsReport({ project, sessions, dateRange, logoUrl, projects
         {travelSessions.length > 0 && (
           <div className="mt-8">
             <h2 className={`text-xl font-bold ${headerTextClass} mb-4 print:text-gray-900`}>
-              Travel Sessions
+              Travel Log
             </h2>
             <table className="w-full text-left border-collapse">
               <thead>
@@ -288,6 +334,64 @@ export function SessionsReport({ project, sessions, dateRange, logoUrl, projects
                   </td>
                   <td colSpan={2} className={`border-t-2 ${borderClass} print:border-gray-300`}></td>
                 </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
+
+        {/* Distance Log Table - Only show if there are distance entries */}
+        {travelEntries.length > 0 && (
+          <div className="mt-8">
+            <h2 className={`text-xl font-bold ${headerTextClass} mb-4 print:text-gray-900`}>
+              Distance Log
+            </h2>
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr>
+                  <th className={`min-w-32 border-b-2 ${borderClass} py-2 px-3 ${tableHeaderBgClass} font-bold uppercase text-xs ${tableHeaderTextClass} print:bg-gray-100 print:text-gray-600 print:border-gray-300`}>
+                    Date
+                  </th>
+                  <th className={`border-b-2 ${borderClass} py-2 px-3 ${tableHeaderBgClass} font-bold uppercase text-xs ${tableHeaderTextClass} text-center print:bg-gray-100 print:text-gray-600 print:border-gray-300`}>
+                    Distance
+                  </th>
+                  <th className={`border-b-2 ${borderClass} py-2 px-3 ${tableHeaderBgClass} font-bold uppercase text-xs ${tableHeaderTextClass} print:bg-gray-100 print:text-gray-600 print:border-gray-300`}>
+                    Project
+                  </th>
+                  <th className={`border-b-2 ${borderClass} py-2 px-3 ${tableHeaderBgClass} font-bold uppercase text-xs ${tableHeaderTextClass} print:bg-gray-100 print:text-gray-600 print:border-gray-300`}>
+                    Note
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {travelEntries.map((entry) => (
+                  <tr key={entry.id} className={`${hoverBgClass} whitespace-nowrap print:hover:bg-gray-50`}>
+                    <td className={`border-b ${borderLightClass} py-2 px-3 print:border-gray-200 print:text-gray-800`}>
+                      {formatDate(entry.date)}
+                    </td>
+                    <td className={`border-b ${borderLightClass} py-2 px-3 text-center print:border-gray-200 print:text-gray-800`}>
+                      {entry.distance.toFixed(1)} {entry.unit}
+                    </td>
+                    <td className={`border-b ${borderLightClass} py-2 px-3 print:border-gray-200 print:text-gray-800`}>
+                       {getProjectName(entry.projectId)}
+                    </td>
+                    <td className={`border-b ${borderLightClass} py-2 px-3 print:border-gray-200 print:text-gray-800`}>
+                      {entry.note || '-'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                {Object.entries(distanceTotals).map(([unit, total]) => (
+                  <tr key={unit}>
+                    <td colSpan={1} className={`py-3 px-3 text-right font-bold uppercase ${footerTextClass} print:text-gray-700`}>
+                      Total ({unit})
+                    </td>
+                    <td className={`py-3 px-3 text-center font-bold ${totalTextClass} border-t-2 ${borderClass} print:text-gray-900 print:border-gray-300`}>
+                      {total.toFixed(1)}
+                    </td>
+                    <td colSpan={2} className={`border-t-2 ${borderClass} print:border-gray-300`}></td>
+                  </tr>
+                ))}
               </tfoot>
             </table>
           </div>
