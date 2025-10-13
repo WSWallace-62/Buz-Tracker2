@@ -1,4 +1,4 @@
- // src/App.tsx
+// src/App.tsx
 import { useEffect, useState, lazy, Suspense, useCallback, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
@@ -14,11 +14,10 @@ import { auth } from './firebase';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { ProjectSelect } from './components/ProjectSelect';
 import { Stopwatch } from './components/Stopwatch';
-import { SessionsTable } from './components/SessionsTable';
 import { Toast } from './components/Toast';
 import { InstallButton } from './pwa/InstallButton';
 import { UserMenu } from './components/UserMenu';
-import { getTotalDuration, formatDuration } from './utils/time';
+import { formatDuration } from './utils/time';
 import { audioManager } from './utils/audioManager';
 import './styles.css';
 
@@ -34,6 +33,7 @@ const AddEntryModal = lazy(() => import('./components/AddEntryModal').then(modul
 const AddTravelDistanceModal = lazy(() => import('./components/AddTravelDistanceModal').then(module => ({ default: module.AddTravelDistanceModal })));
 const ProjectManagerModal = lazy(() => import('./components/ProjectManagerModal').then(module => ({ default: module.ProjectManagerModal })));
 const ConfirmDialog = lazy(() => import('./components/ConfirmDialog').then(module => ({ default: module.ConfirmDialog })));
+const TodaysActivity = lazy(() => import('./components/TodaysActivity'));
 
 type Tab = 'tracker' | 'history' | 'settings' | 'profile' | 'customers' | 'corporate' | 'faq';
 
@@ -48,7 +48,7 @@ export function App() {
 function AppContent() {
   const isOnline = useOnlineStatus();
   const { reconcileProjects, startProjectSync, stopProjectSync } = useProjectsStore();
-  const { getTodaySessions, startSync, stopSync, reconcileSessions } = useSessionsStore();
+  const { startSync, stopSync, reconcileSessions } = useSessionsStore();
   const { startPredefinedNotesSync, stopPredefinedNotesSync } = usePredefinedNotesStore();
   const { startCustomerSync, stopCustomerSync, loadCustomers } = useCustomersStore();
   const { startOrganizationSync, stopOrganizationSync, loadOrganization } = useOrganizationStore();
@@ -212,9 +212,6 @@ function AppContent() {
     );
   }
 
-  const todaySessions = getTodaySessions(currentProjectId || undefined);
-  const todayTotal = getTotalDuration(todaySessions);
-
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <a href="#main-content" className="skip-link">Skip to main content</a>
@@ -302,7 +299,7 @@ function AppContent() {
                     Add Travel Distance
                   </button>
                 </div>
-                <SessionsTable projectId={currentProjectId || undefined} todayTotal={todayTotal} />
+                <TodaysActivity />
               </div>
             } />
             <Route path="/customers" element={<CustomersPage />} />

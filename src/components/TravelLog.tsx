@@ -5,18 +5,26 @@ import { useProjectsStore } from '../store/projects';
 import { useUIStore } from '../store/ui';
 import EditTravelEntryModal from './EditTravelEntryModal';
 
-const TravelLog: React.FC = () => {
-  const { travelEntries, deleteTravelEntry, loadTravelEntries } = useTravelEntriesStore();
+interface TravelLogProps {
+  sessions: TravelEntry[];
+}
+
+const TravelLog: React.FC<TravelLogProps> = ({ sessions }) => {
+  const { deleteTravelEntry } = useTravelEntriesStore();
   const { customers, loadCustomers } = useCustomersStore();
   const { projects, loadProjects } = useProjectsStore();
   const { showConfirm, showToast } = useUIStore();
   const [editingEntry, setEditingEntry] = useState<TravelEntry | null>(null);
 
   useEffect(() => {
-    loadTravelEntries();
     loadCustomers();
     loadProjects();
-  }, [loadTravelEntries, loadCustomers, loadProjects]);
+  }, [loadCustomers, loadProjects]);
+
+  const getProjectColor = (projectId: number) => {
+    const project = projects.find(p => p.id === projectId);
+    return project?.color || '#6b7280'; // Default gray if no color
+  };
 
   const handleEdit = (entry: TravelEntry) => {
     setEditingEntry(entry);
@@ -46,23 +54,33 @@ const TravelLog: React.FC = () => {
           <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
             <tr>
               <th scope="col" className="px-6 py-3">Date</th>
+              <th scope="col" className="px-6 py-3">Distance</th>
               <th scope="col" className="px-6 py-3">Customer</th>
               <th scope="col" className="px-6 py-3">Project</th>
-              <th scope="col" className="px-6 py-3">Distance</th>
               <th scope="col" className="px-6 py-3">Note</th>
               <th scope="col" className="px-6 py-3">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {travelEntries.map(entry => {
+            {sessions.map(entry => {
               const customer = customers.find(c => c.id === entry.customerId || c.firestoreId === entry.customerFirestoreId);
               const project = projects.find(p => p.id === entry.projectId);
               return (
                 <tr key={entry.id} className="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
                   <td className="px-6 py-4">{new Date(entry.date).toLocaleDateString()}</td>
-                  <td className="px-6 py-4">{customer?.companyName || 'N/A'}</td>
-                  <td className="px-6 py-4">{project?.name || 'N/A'}</td>
                   <td className="px-6 py-4">{entry.distance} {entry.unit}</td>
+                  <td className="px-6 py-4">{customer?.companyName || 'N/A'}</td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center">
+                      {project && (
+                        <div
+                          className="w-3 h-3 rounded-full mr-2 flex-shrink-0"
+                          style={{ backgroundColor: getProjectColor(project.id!) }}
+                        />
+                      )}
+                      {project?.name || 'N/A'}
+                    </div>
+                  </td>
                   <td className="px-6 py-4">{entry.note}</td>
                   <td className="px-6 py-4">
                     <div className="flex items-center space-x-2">

@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db as dexieDB } from '../db/dexie';
+import { db as dexieDB, type TravelEntry } from '../db/dexie';
 import { useSessionsStore } from '../store/sessions';
 import { useProjectsStore } from '../store/projects';
 import { useCustomersStore } from '../store/customers';
@@ -89,6 +89,16 @@ export function HistoryPanel() {
     return query.toArray();
   }, [startDate, endDate]);
 
+  const travelEntries = useLiveQuery(() => {
+    // Dexie table might not exist on older client DBs
+    if (!dexieDB.travelEntries) return Promise.resolve([] as TravelEntry[]);
+    const query = dexieDB.travelEntries
+      .where('date')
+      .between(startDate, endDate);
+
+    return query.toArray();
+  }, [startDate, endDate]);
+
   const filteredSessions = useMemo(() => {
     if (!sessions) return [];
 
@@ -138,6 +148,40 @@ export function HistoryPanel() {
 
     return filtered;
   }, [sessions, selectedProjectIds, noteFilter, sortOrder, projects, customers]);
+
+  const filteredTravelEntries = useMemo(() => {
+    if (!travelEntries) return [];
+
+    let filtered = travelEntries;
+
+    // Filter out entries from archived projects and archived customers
+    filtered = filtered.filter(t => {
+      const project = projects.find(p => p.id === t.projectId);
+
+      // Filter out archived projects
+      if (project?.archived) return false;
+
+      // Filter out projects from archived customers
+      if (project?.customerFirestoreId) {
+        const customer = customers.find(c => c.firestoreId === project.customerFirestoreId);
+        if (customer?.archived) return false;
+      } else if (project?.customerId) {
+        const customer = customers.find(c => c.id === project.customerId);
+        if (customer?.archived) return false;
+      }
+
+      return true;
+    });
+
+    if (selectedProjectIds.length > 0) {
+      filtered = filtered.filter(t => selectedProjectIds.includes(t.projectId));
+    }
+
+    // Note: Sorting for travel entries is handled within the TravelLog component for now.
+    // Note: Note filter does not apply to travel entries in this panel.
+
+    return filtered;
+  }, [travelEntries, selectedProjectIds, projects, customers]);
 
   const summaryData = useMemo(() => {
     const totalMs = getTotalDuration(filteredSessions);
@@ -582,7 +626,7 @@ export function HistoryPanel() {
 
       {activeTab === 'travel' && (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md no-print">
-          <TravelLog />
+          <TravelLog sessions={filteredTravelEntries || []} />
         </div>
       )}
 
