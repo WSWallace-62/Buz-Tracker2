@@ -203,8 +203,8 @@ export class BuzTrackerDB extends Dexie {
   }
 
   async initializeDatabase() {
-    await this.transaction('rw', this.projects, this.settings, this.predefinedNotes, this.customers, this.travelEntries, async () => {
-      // Initialize default settings
+    await this.transaction('rw', this.settings, async () => {
+      // Initialize default settings if they don't exist
       const settingsCount = await this.settings.count();
       if (settingsCount === 0) {
         await this.settings.add({
@@ -214,78 +214,9 @@ export class BuzTrackerDB extends Dexie {
           enableSmartReminders: false,
           reminderThresholdHours: 4
         });
-      }
-
-      // Initialize default customer (KJ Controls)
-      const customersCount = await this.customers.count();
-      if (customersCount === 0) {
-        await this.customers.add({
-          companyName: 'KJ Controls',
-          address: '1983 Main Road',
-          city: 'Nanaimo',
-          province: 'BC',
-          postalCode: 'V9X-1T6',
-          country: 'Canada',
-          contacts: [
-            { name: 'James Boileau', email: '' },
-            { name: 'Burke Bridges', email: '' }
-          ],
-          standardRate: 90,
-          travelRate: 55,
-          travelDistanceUnit: 'km',
-          perDiemRate: 0,
-          currency: 'CAD',
-          createdAt: Date.now(),
-          archived: false
-        });
-      }
-
-      // Initialize default project
-      const projectsCount = await this.projects.count();
-      if (projectsCount === 0) {
-        // Get the KJ Controls customer ID
-        const kjControls = await this.customers.where('companyName').equals('KJ Controls').first();
-
-        await this.projects.add({
-          name: 'Default Project',
-          color: '#3b82f6',
-          createdAt: Date.now(),
-          archived: false,
-          customerId: kjControls?.id,
-          customerFirestoreId: kjControls?.firestoreId
-        });
-      } else {
-        // Migration: Link "Parksville Water System" to KJ Controls if it exists
-        const parksvilleProject = await this.projects.where('name').equals('Parksville Water System').first();
-        const kjControls = await this.customers.where('companyName').equals('KJ Controls').first();
-
-        if (parksvilleProject && kjControls && !parksvilleProject.customerId) {
-          await this.projects.update(parksvilleProject.id!, {
-            customerId: kjControls.id,
-            customerFirestoreId: kjControls.firestoreId
-          });
-          console.log('Linked Parksville Water System to KJ Controls');
-        }
-      }
-
-      // Initialize default predefined notes
-      const predefinedNotesCount = await this.predefinedNotes.count();
-      if (predefinedNotesCount === 0) {
-        const defaultNotes = [
-          'Programming and configuration',
-          'Meeting',
-          'Travel',
-          'Admin'
-        ];
-        for (const note of defaultNotes) {
-          await this.predefinedNotes.add({
-            note,
-            createdAt: Date.now()
-          });
-        }
+        console.log("Default settings initialized.");
       }
     });
-    console.log("Database initialized with default data.");
   }
 }
 

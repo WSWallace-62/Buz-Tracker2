@@ -29,8 +29,10 @@ const TodaysActivity: React.FC = () => {
     );
   }
 
-  const todaysSessions = sessions;
-  const todaysTravel = travelEntries;
+  const todayStart = startOfDay(Date.now());
+  const todayEnd = endOfDay(Date.now());
+  const todaysSessions = sessions.filter(s => s.start >= todayStart && s.start <= todayEnd);
+  const todaysTravel = travelEntries.filter(t => t.date >= todayStart && t.date <= todayEnd);
 
   return (
     <div className="mt-4">
