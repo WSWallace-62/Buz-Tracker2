@@ -226,7 +226,6 @@ export const useTravelEntriesStore = create<TravelEntriesState>((set, get) => ({
       }
 
       await get().loadTravelEntries();
-      useUIStore.getState().showToast('Travel entry added successfully', 'success');
     } catch (error) {
       console.error("Failed to create travel entry:", error);
       useUIStore.getState().showToast('Failed to add travel entry', 'error');
@@ -280,7 +279,6 @@ export const useTravelEntriesStore = create<TravelEntriesState>((set, get) => ({
       }
 
       await get().loadTravelEntries();
-      useUIStore.getState().showToast('Travel entry deleted successfully', 'success');
     } catch (error) {
       console.error("Failed to delete travel entry:", error);
       useUIStore.getState().showToast('Failed to delete travel entry', 'error');
