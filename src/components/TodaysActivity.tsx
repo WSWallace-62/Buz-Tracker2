@@ -13,13 +13,11 @@ const TodaysActivity: React.FC = () => {
   const { travelEntries, loadTravelEntries } = useTravelEntriesStore();
 
   useEffect(() => {
-    if (currentProjectId !== null) {
-      const todayStart = startOfDay(Date.now());
-      const todayEnd = endOfDay(Date.now());
-      loadSessions({ startDate: todayStart, endDate: todayEnd, projectIds: [currentProjectId] });
-      loadTravelEntries({ startDate: todayStart, endDate: todayEnd, projectIds: [currentProjectId] });
-    }
-  }, [currentProjectId, loadSessions, loadTravelEntries]);
+    const todayStart = startOfDay(Date.now());
+    const todayEnd = endOfDay(Date.now());
+    loadSessions({ startDate: todayStart, endDate: todayEnd });
+    loadTravelEntries({ startDate: todayStart, endDate: todayEnd });
+  }, [loadSessions, loadTravelEntries]);
 
   if (currentProjectId === null) {
     return (
