@@ -41,13 +41,17 @@ const TravelLog: React.FC<TravelLogProps> = ({ sessions }) => {
     }
   }, [projects]);
 
-  const getProjectColor = (projectId: number) => {
-    const project = projects.find(p => p.id === projectId);
+  const findProject = (projectId: number | string) => {
+    return projects.find(p => p.id === projectId || p.firestoreId === projectId);
+  };
+
+  const getProjectColor = (projectId: number | string) => {
+    const project = findProject(projectId);
     return project?.color || '#6b7280'; // Default gray if no color
   };
 
-  const getProjectName = (projectId: number) => {
-    const project = projects.find(p => p.id === projectId);
+  const getProjectName = (projectId: number | string) => {
+    const project = findProject(projectId);
     if (!project) {
       // Debug: show the projectId that couldn't be found
       return `Unknown Project (ID: ${projectId})`;
@@ -55,8 +59,8 @@ const TravelLog: React.FC<TravelLogProps> = ({ sessions }) => {
     return project.name;
   };
 
-  const getCustomerName = (projectId: number) => {
-    const project = projects.find(p => p.id === projectId);
+  const getCustomerName = (projectId: number | string) => {
+    const project = findProject(projectId);
     if (!project) return 'N/A';
 
     const customer = customers.find(c =>

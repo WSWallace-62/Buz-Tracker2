@@ -81,8 +81,8 @@ export interface PredefinedNote {
 
 export interface TravelEntry {
   id?: number
-  projectId: number
-  customerId: number
+  projectId: number | string
+  customerId: number | string
   customerFirestoreId?: string
   date: number
   distance: number

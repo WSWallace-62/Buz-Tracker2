@@ -66,8 +66,8 @@ export function AddTravelDistanceModal() {
         }
 
         setFormData({
-          customerId: projectCustomer?.id?.toString() || '',
-          projectId: currentProject.id?.toString() || '',
+          customerId: projectCustomer?.firestoreId?.toString() || projectCustomer?.id?.toString() || '',
+          projectId: currentProject.firestoreId?.toString() || currentProject.id?.toString() || '',
           date: dayjs().format('YYYY-MM-DD'),
           distance: '',
           note: '',
@@ -114,21 +114,15 @@ export function AddTravelDistanceModal() {
       const dateTimestamp = dayjs(formData.date).startOf('day').valueOf();
 
       // Get the selected project to derive customer information
-      const selectedProject = projects.find(p => p.id?.toString() === formData.projectId);
+      const selectedProject = projects.find(p => p.id?.toString() === formData.projectId || p.firestoreId === formData.projectId);
       if (!selectedProject) {
         showToast('Selected project not found', 'error');
         return;
       }
 
       // Derive customer ID from project
-      let customerId = selectedProject.customerId;
       const customerFirestoreId = selectedProject.customerFirestoreId;
-
-      // If customerId is not set but customerFirestoreId is, find the local customer ID
-      if (!customerId && customerFirestoreId) {
-        const customer = customers.find(c => c.firestoreId === customerFirestoreId);
-        customerId = customer?.id;
-      }
+      const customerId = selectedCustomer?.firestoreId || selectedCustomer?.id;
 
       if (!customerId) {
         showToast('Could not determine customer for this project', 'error');
@@ -136,7 +130,7 @@ export function AddTravelDistanceModal() {
       }
 
       await createTravelEntry({
-        projectId: parseInt(formData.projectId),
+        projectId: selectedProject.firestoreId || selectedProject.id!,
         customerId: customerId,
         customerFirestoreId: customerFirestoreId,
         date: dateTimestamp,
