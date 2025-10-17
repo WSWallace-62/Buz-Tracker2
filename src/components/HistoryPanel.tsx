@@ -671,6 +671,7 @@ export function HistoryPanel() {
                   : null
               }
               sessions={filteredSessions}
+              travelEntries={filteredTravelEntries}
               dateRange={{ start: customStart || formatDate(startDate), end: customEnd || formatDate(endDate) }}
               projects={projects}
               // Optional logo: place a file at public/company-logo.png to display

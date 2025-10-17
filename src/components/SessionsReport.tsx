@@ -188,7 +188,7 @@ export function SessionsReport({ project, sessions, travelEntries = [], dateRang
             <p className={`text-xs ${mutedTextClass} print:text-gray-500`}>{userName}</p>
           )}
           <h1 className={`text-2xl font-bold ${headerTextClass} print:text-gray-900 mt-6`}>
-            Time Log Report
+            Log Report
           </h1>
           <p className={`text-sm ${subTextClass} print:text-gray-600`}>
             {project ? (
