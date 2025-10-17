@@ -46,7 +46,7 @@ export function HistoryPanel() {
   const [dateFilter, setDateFilter] = useState<DateFilter>('thisYear');
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
-  const [selectedProjectIds, setSelectedProjectIds] = useState<number[]>([]);
+  const [selectedProjectIds, setSelectedProjectIds] = useState<(string | number)[]>([]);
   const [groupBy, setGroupBy] = useState<GroupBy>('day');
   const [sortOrder, setSortOrder] = useState<'date-desc' | 'date-asc' | 'start-desc' | 'start-asc'>('date-desc');
   const [noteFilter, setNoteFilter] = useState('');
@@ -124,7 +124,8 @@ export function HistoryPanel() {
     });
 
     if (selectedProjectIds.length > 0) {
-      filtered = filtered.filter(s => selectedProjectIds.includes(s.projectId));
+      const projectIdsSet = new Set(selectedProjectIds);
+      filtered = filtered.filter(s => projectIdsSet.has(s.projectId));
     }
 
     if (noteFilter) {
@@ -156,7 +157,7 @@ export function HistoryPanel() {
 
     // Filter out entries from archived projects and archived customers
     filtered = filtered.filter(t => {
-      const project = projects.find(p => p.id === t.projectId);
+      const project = projects.find(p => p.id === t.projectId || p.firestoreId === t.projectId);
 
       // Filter out archived projects
       if (project?.archived) return false;
@@ -174,7 +175,8 @@ export function HistoryPanel() {
     });
 
     if (selectedProjectIds.length > 0) {
-      filtered = filtered.filter(t => selectedProjectIds.includes(t.projectId));
+      const projectIdsSet = new Set(selectedProjectIds);
+      filtered = filtered.filter(t => projectIdsSet.has(t.projectId));
     }
 
     // Note: Sorting for travel entries is handled within the TravelLog component for now.
@@ -193,7 +195,7 @@ export function HistoryPanel() {
 
   const chartData = useMemo(() => {
     if (groupBy === 'project') {
-      const projectTotals = new Map<number, number>();
+      const projectTotals = new Map<string | number, number>();
 
       filteredSessions.forEach(session => {
         const current = projectTotals.get(session.projectId) || 0;

@@ -33,8 +33,8 @@ interface TravelEntriesState {
   loadTravelEntries: (filters?: {
     startDate?: number;
     endDate?: number;
-    projectIds?: number[];
-    customerIds?: number[];
+    projectIds?: (string | number)[];
+    customerIds?: (string | number)[];
   }) => Promise<void>;
   createTravelEntry: (entry: Omit<TravelEntry, 'id' | 'createdAt' | 'firestoreId'>) => Promise<void>;
   updateTravelEntry: (id: number, updates: Partial<TravelEntry>) => Promise<void>;
@@ -155,7 +155,8 @@ export const useTravelEntriesStore = create<TravelEntriesState>((set, get) => ({
       let entries = await query.reverse().toArray();
 
       if (filters?.projectIds && filters.projectIds.length > 0) {
-        entries = entries.filter(entry => filters.projectIds!.includes(entry.projectId));
+        const projectIdsSet = new Set(filters.projectIds);
+        entries = entries.filter(entry => projectIdsSet.has(entry.projectId));
       }
 
       if (filters?.customerIds && filters.customerIds.length > 0) {
@@ -174,7 +175,7 @@ export const useTravelEntriesStore = create<TravelEntriesState>((set, get) => ({
 
         entries = entries.filter(entry => {
           // Match by local customerId OR by customerFirestoreId
-          const matchesLocalId = customerIdSet.has(entry.customerId);
+          const matchesLocalId = entry.customerId != null && customerIdSet.has(entry.customerId);
           const matchesFirestoreId = entry.customerFirestoreId && firestoreIdSet.has(entry.customerFirestoreId);
           return matchesLocalId || matchesFirestoreId;
         });

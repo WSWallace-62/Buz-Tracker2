@@ -97,8 +97,8 @@ export function SessionsReport({ project, sessions, travelEntries = [], dateRang
     return totals;
   }, [travelEntries]);
 
-  const getProjectName = (projectId: number) => {
-    const project = projects.find(p => p.id === projectId);
+  const getProjectName = (projectId: number | string) => {
+    const project = projects.find(p => p.id === projectId || p.firestoreId === projectId);
     return project?.name || 'Unknown Project';
   };
 
