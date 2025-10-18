@@ -1,8 +1,10 @@
 import { create } from 'zustand'
-import { db, Project } from '../db/dexie'
+import { db, type Project } from '../db/dexie'
 import { db as firestoreDB } from '../firebase'
 import { collection, addDoc, doc, updateDoc, deleteDoc, getDocs, onSnapshot, query, Unsubscribe } from 'firebase/firestore'
 import { useAuthStore } from './auth'
+
+export type { Project };
 
 // Keep track of the unsubscribe function for projects
 let unsubscribeFromProjects: Unsubscribe | null = null;
