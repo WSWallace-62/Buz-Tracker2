@@ -21,50 +21,23 @@ export function AddTravelDistanceModal() {
 
   const [unit, setUnit] = useState<'km' | 'miles'>('km');
 
-  // Get the current project
   const currentProject = useMemo(
     () => projects.find(p => p.id === currentProjectId),
     [projects, currentProjectId]
   );
 
-  // Get the customer for the current project (used for displaying customer info)
   const selectedCustomer = useMemo(() => {
     if (!currentProject) return null;
-
-    // First try to find by customerFirestoreId
     if (currentProject.customerFirestoreId) {
-      const customer = customers.find(c => c.firestoreId === currentProject.customerFirestoreId);
-      if (customer) return customer;
+      return customers.find(c => c.firestoreId === currentProject.customerFirestoreId);
     }
-
-    // Fallback to customerId
-    if (currentProject.customerId) {
-      return customers.find(c => c.id === currentProject.customerId);
-    }
-
-    return null;
+    return customers.find(c => c.id === currentProject.customerId);
   }, [currentProject, customers]);
 
-  // Update unit when customer changes
-
-  // Reset form when modal opens - auto-populate from current project
   useEffect(() => {
     if (isTravelDistanceModalOpen) {
-      // If there's a current project, use it and its customer
       if (currentProject) {
-        // Find the customer for this project
-        let projectCustomer = null;
-
-        // First try to find by customerFirestoreId
-        if (currentProject.customerFirestoreId) {
-          projectCustomer = customers.find(c => c.firestoreId === currentProject.customerFirestoreId);
-        }
-
-        // Fallback to customerId if customerFirestoreId didn't work
-        if (!projectCustomer && currentProject.customerId) {
-          projectCustomer = customers.find(c => c.id === currentProject.customerId);
-        }
-
+        const projectCustomer = selectedCustomer;
         setFormData({
           customerId: projectCustomer?.firestoreId?.toString() || projectCustomer?.id?.toString() || '',
           projectId: currentProject.firestoreId?.toString() || currentProject.id?.toString() || '',
@@ -72,13 +45,10 @@ export function AddTravelDistanceModal() {
           distance: '',
           note: '',
         });
-
-        // Set unit from customer if available
         if (projectCustomer) {
           setUnit(projectCustomer.travelDistanceUnit || 'km');
         }
       } else {
-        // No current project, reset to empty
         setFormData({
           customerId: '',
           projectId: '',
@@ -89,13 +59,12 @@ export function AddTravelDistanceModal() {
         setUnit('km');
       }
     }
-  }, [isTravelDistanceModalOpen, currentProject, customers]);
+  }, [isTravelDistanceModalOpen, currentProject, selectedCustomer]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validation - only check for project since customer is derived from project
-    if (!formData.projectId) {
+    if (!formData.projectId || !currentProject) {
       showToast('Please select a project', 'error');
       return;
     }
@@ -105,23 +74,8 @@ export function AddTravelDistanceModal() {
       return;
     }
 
-    if (!formData.date) {
-      showToast('Please select a date', 'error');
-      return;
-    }
-
     try {
       const dateTimestamp = dayjs(formData.date).startOf('day').valueOf();
-
-      // Get the selected project to derive customer information
-      const selectedProject = projects.find(p => p.id?.toString() === formData.projectId || p.firestoreId === formData.projectId);
-      if (!selectedProject) {
-        showToast('Selected project not found', 'error');
-        return;
-      }
-
-      // Derive customer ID from project
-      const customerFirestoreId = selectedProject.customerFirestoreId;
       const customerId = selectedCustomer?.firestoreId || selectedCustomer?.id;
 
       if (!customerId) {
@@ -129,30 +83,33 @@ export function AddTravelDistanceModal() {
         return;
       }
 
-      await createTravelEntry({
-        projectId: selectedProject.firestoreId || selectedProject.id!,
+      const success = await createTravelEntry({
+        // Use the firestoreId if available, otherwise fall back to the local ID.
+        // The store logic will handle resolving this to the correct local project ID.
+        projectId: currentProject.firestoreId || currentProject.id!,
         customerId: customerId,
-        customerFirestoreId: customerFirestoreId,
+        customerFirestoreId: currentProject.customerFirestoreId,
         date: dateTimestamp,
         distance: parseFloat(formData.distance),
         unit,
         note: formData.note.trim() || undefined,
       });
 
-      showToast('Travel distance added successfully', 'success');
-      closeTravelDistanceModal();
+      if (success) {
+        showToast('Travel distance added successfully', 'success');
+        closeTravelDistanceModal();
+      }
+      // If not successful, the store will have already shown an error toast.
     } catch (error) {
-      console.error('Failed to add travel entry:', error);
-      showToast('Failed to add travel distance', 'error');
+      // The store now handles all error logging and toasts.
+      // This catch block is kept as a fallback, but should not be reached if the store is working correctly.
+      console.error('An unexpected error occurred in handleSubmit:', error);
     }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      closeTravelDistanceModal();
-    } else if (e.key === 'Enter' && e.ctrlKey) {
-      handleSubmit(e as any);
-    }
+    if (e.key === 'Escape') closeTravelDistanceModal();
+    else if (e.key === 'Enter' && e.ctrlKey) handleSubmit(e as any);
   };
 
   if (!isTravelDistanceModalOpen) return null;
@@ -167,9 +124,7 @@ export function AddTravelDistanceModal() {
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
             Add Travel Distance
           </h2>
-
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Customer Display (Read-only) */}
             {currentProject && selectedCustomer && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -180,8 +135,6 @@ export function AddTravelDistanceModal() {
                 </div>
               </div>
             )}
-
-            {/* Project Display (Read-only) */}
             {currentProject && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -192,8 +145,6 @@ export function AddTravelDistanceModal() {
                 </div>
               </div>
             )}
-
-            {/* Show warning if no project is selected */}
             {!currentProject && (
               <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md">
                 <p className="text-sm text-yellow-800 dark:text-yellow-200">
@@ -201,8 +152,6 @@ export function AddTravelDistanceModal() {
                 </p>
               </div>
             )}
-
-            {/* Date */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Date <span className="text-red-500">*</span>
@@ -215,8 +164,6 @@ export function AddTravelDistanceModal() {
                 required
               />
             </div>
-
-            {/* Distance */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Distance ({unit}) <span className="text-red-500">*</span>
@@ -237,8 +184,6 @@ export function AddTravelDistanceModal() {
                 </p>
               )}
             </div>
-
-            {/* Note */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Note
@@ -251,8 +196,6 @@ export function AddTravelDistanceModal() {
                 placeholder="Optional note about this travel"
               />
             </div>
-
-            {/* Buttons */}
             <div className="flex justify-end gap-3 pt-4">
               <button
                 type="button"
@@ -269,7 +212,6 @@ export function AddTravelDistanceModal() {
                 Add Travel Distance
               </button>
             </div>
-
             <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
               Press Ctrl+Enter to submit, Esc to cancel
             </p>

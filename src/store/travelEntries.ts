@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { db, type TravelEntry } from '../db/dexie';
+import { db, type TravelEntry, type Project } from '../db/dexie';
 import { getAuth } from 'firebase/auth';
 import { useUIStore } from './ui';
 import {
@@ -17,10 +17,7 @@ import { useProjectsStore } from './projects';
 
 export type { TravelEntry };
 
-// Keep track of the unsubscribe function
 let unsubscribeFromFirestore: Unsubscribe | null = null;
-
-// Track recently added firestoreIds to prevent duplicates from sync listener
 const recentlyAddedIds = new Set<string>();
 
 interface TravelEntriesState {
@@ -28,20 +25,13 @@ interface TravelEntriesState {
   isLoading: boolean;
   error: string | null;
   isSyncing: boolean;
-
-  // Actions
-  loadTravelEntries: (filters?: {
-    startDate?: number;
-    endDate?: number;
-    projectIds?: (string | number)[];
-    customerIds?: (string | number)[];
-  }) => Promise<void>;
-  createTravelEntry: (entry: Omit<TravelEntry, 'id' | 'createdAt' | 'firestoreId'>) => Promise<void>;
+  loadTravelEntries: (filters?: any) => Promise<void>;
+  createTravelEntry: (entry: Omit<TravelEntry, 'id' | 'createdAt' | 'firestoreId'>) => Promise<boolean>;
   updateTravelEntry: (id: number, updates: Partial<TravelEntry>) => Promise<void>;
   deleteTravelEntry: (id: number) => Promise<void>;
-  subscribeToTravelEntries: () => Unsubscribe;
   startSync: () => void;
   stopSync: () => void;
+  reconcileTravelEntries: () => Promise<void>;
 }
 
 export const useTravelEntriesStore = create<TravelEntriesState>((set, get) => ({
@@ -53,38 +43,27 @@ export const useTravelEntriesStore = create<TravelEntriesState>((set, get) => ({
   startSync: () => {
     const user = getAuth().currentUser;
     if (!user || !firestoreDb) {
-      console.log("User not logged in or firestore not available. Skipping travel entries sync.");
       get().loadTravelEntries();
       return;
     }
 
-    if (unsubscribeFromFirestore) {
-      console.log("Travel entries sync already active.");
-      return;
-    }
+    if (get().isSyncing) return;
 
     set({ isSyncing: true });
-    console.log("Starting Firestore travel entries sync...");
+    const travelEntriesQuery = query(collection(firestoreDb, 'users', user.uid, 'travelEntries'));
 
-    const travelEntriesCollection = query(collection(firestoreDb, 'users', user.uid, 'travelEntries'));
-
-    unsubscribeFromFirestore = onSnapshot(travelEntriesCollection, async (snapshot) => {
-      set({ isLoading: true });
+    unsubscribeFromFirestore = onSnapshot(travelEntriesQuery, async (snapshot) => {
       const changes = snapshot.docChanges();
-
       await db.transaction('rw', db.travelEntries, async () => {
-        // Get projects to convert Firestore project IDs to local IDs
         const projects = useProjectsStore.getState().projects;
-        
+
         for (const change of changes) {
           const firestoreData = change.doc.data();
           const firestoreId = change.doc.id;
 
-          // Convert Firestore projectId to local projectId
           const firestoreProjectId = firestoreData.projectId;
           let localProjectId = firestoreProjectId;
-          
-          // Check if projectId is a Firestore ID (string) and convert to local ID
+
           if (typeof firestoreProjectId === 'string') {
             const project = projects.find(p => p.firestoreId === firestoreProjectId);
             if (project?.id) {
@@ -94,315 +73,155 @@ export const useTravelEntriesStore = create<TravelEntriesState>((set, get) => ({
 
           const existingEntry = await db.travelEntries.where('firestoreId').equals(firestoreId).first();
 
-          switch (change.type) {
-            case 'added':
-              if (recentlyAddedIds.has(firestoreId)) {
-                break;
-              }
-              if (!existingEntry) {
-                await db.travelEntries.add({
-                  ...firestoreData,
-                  projectId: localProjectId,
-                  firestoreId,
-                } as TravelEntry);
-              }
-              break;
-            case 'modified':
-              if (existingEntry?.id) {
-                await db.travelEntries.update(existingEntry.id, {
-                  ...firestoreData,
-                  projectId: localProjectId,
-                  firestoreId,
-                });
-              }
-              break;
-            case 'removed':
-              if (existingEntry?.id) {
-                await db.travelEntries.delete(existingEntry.id);
-              }
-              break;
+          if (change.type === 'added' && !recentlyAddedIds.has(firestoreId) && !existingEntry) {
+            await db.travelEntries.add({ ...firestoreData, projectId: localProjectId, firestoreId } as TravelEntry);
+          } else if (change.type === 'modified' && existingEntry?.id) {
+            await db.travelEntries.update(existingEntry.id, { ...firestoreData, projectId: localProjectId, firestoreId });
+          } else if (change.type === 'removed' && existingEntry?.id) {
+            await db.travelEntries.delete(existingEntry.id);
           }
         }
       });
-
       await get().loadTravelEntries();
     }, (error) => {
-      console.error("Error with Firestore travel entries snapshot listener:", error);
-      set({ error: "Failed to sync travel entries.", isSyncing: false });
+      console.error("Error with Firestore listener:", error);
+      set({ error: "Failed to sync.", isSyncing: false });
     });
   },
 
   stopSync: () => {
-    if (unsubscribeFromFirestore) {
-      console.log("Stopping Firestore travel entries sync.");
-      unsubscribeFromFirestore();
-      unsubscribeFromFirestore = null;
-    }
+    unsubscribeFromFirestore?.();
+    unsubscribeFromFirestore = null;
     set({ isSyncing: false });
   },
 
-  loadTravelEntries: async (filters) => {
+  loadTravelEntries: async (filters = {}) => {
     set({ isLoading: true, error: null });
     try {
       let query = db.travelEntries.orderBy('date');
-
-      if (filters?.startDate && filters?.endDate) {
-        query = query.filter(entry =>
-          entry.date >= filters.startDate! && entry.date <= filters.endDate!
-        );
+      if (filters.startDate && filters.endDate) {
+        query = query.filter(e => e.date >= filters.startDate && e.date <= filters.endDate);
       }
-
       let entries = await query.reverse().toArray();
-
-      if (filters?.projectIds && filters.projectIds.length > 0) {
-        const projectIdsSet = new Set(filters.projectIds);
-        entries = entries.filter(entry => projectIdsSet.has(entry.projectId));
+      if (filters.projectIds?.length) {
+        const idSet = new Set(filters.projectIds);
+        entries = entries.filter(e => idSet.has(e.projectId));
       }
-
-      if (filters?.customerIds && filters.customerIds.length > 0) {
-        // Need to match by both customerFirestoreId and customerId for backward compatibility
-        // First, get all customers to build a mapping
+      if (filters.customerIds?.length) {
         const customers = await db.customers.toArray();
         const customerIdSet = new Set(filters.customerIds);
-
-        // Build a set of firestoreIds that correspond to the requested customerIds
-        const firestoreIdSet = new Set<string>();
-        customers.forEach(customer => {
-          if (customer.id && customerIdSet.has(customer.id) && customer.firestoreId) {
-            firestoreIdSet.add(customer.firestoreId);
-          }
-        });
-
-        entries = entries.filter(entry => {
-          // Match by local customerId OR by customerFirestoreId
-          const matchesLocalId = entry.customerId != null && customerIdSet.has(entry.customerId);
-          const matchesFirestoreId = entry.customerFirestoreId && firestoreIdSet.has(entry.customerFirestoreId);
-          return matchesLocalId || matchesFirestoreId;
-        });
+        const firestoreIdSet = new Set(customers.filter(c => c.id && customerIdSet.has(c.id) && c.firestoreId).map(c => c.firestoreId!));
+        entries = entries.filter(e => (e.customerId != null && customerIdSet.has(e.customerId)) || (e.customerFirestoreId && firestoreIdSet.has(e.customerFirestoreId)));
       }
-
       set({ travelEntries: entries, isLoading: false });
-    } catch (error) {
-      console.error("Failed to load travel entries:", error);
+    } catch (e) {
+      console.error("Failed to load travel entries:", e);
       set({ error: "Failed to load travel entries.", isLoading: false });
     }
   },
 
   createTravelEntry: async (entryData) => {
     const user = getAuth().currentUser;
-    
+    const { showToast } = useUIStore.getState();
+
     try {
-      const newEntry: Omit<TravelEntry, 'id'> = {
+      let project: Project | undefined;
+      if (typeof entryData.projectId === 'string') {
+        project = await db.projects.where('firestoreId').equals(entryData.projectId).first();
+      } else {
+        project = await db.projects.get(entryData.projectId);
+      }
+
+      if (!project) {
+        throw new Error(`Project with ID ${entryData.projectId} not found locally.`);
+      }
+
+      const newEntryForDexie: Omit<TravelEntry, 'id'> = {
         ...entryData,
+        projectId: project.id!,
+        customerId: project.customerId!,
+        customerFirestoreId: project.customerFirestoreId,
         createdAt: Date.now(),
         userId: user?.uid,
       };
 
-      const localId = await db.travelEntries.add(newEntry as TravelEntry);
+      const localId = await db.travelEntries.add(newEntryForDexie as TravelEntry);
+      const newEntryForState = { ...newEntryForDexie, id: localId } as TravelEntry;
+      set(state => ({
+        travelEntries: [newEntryForState, ...state.travelEntries].sort((a, b) => b.date - a.date)
+      }));
 
-      if (user && firestoreDb) {
+      if (user && firestoreDb && navigator.onLine) {
+        const entryForFirestore = { ...newEntryForDexie, projectId: project.firestoreId };
         try {
-          // Convert local projectId to Firestore projectId before syncing
-          const projects = useProjectsStore.getState().projects;
-          const project = projects.find(p => p.id === entryData.projectId);
-          
-          const entryForFirestore = {
-            ...newEntry,
-            projectId: project?.firestoreId || entryData.projectId, // Use Firestore ID if available
-          };
-          
-          const docRef = await addDoc(
-            collection(firestoreDb, 'users', user.uid, 'travelEntries'),
-            entryForFirestore
-          );
-
-          recentlyAddedIds.add(docRef.id);
-          setTimeout(() => recentlyAddedIds.delete(docRef.id), 5000);
+          const docRef = await addDoc(collection(firestoreDb, 'users', user.uid, 'travelEntries'), entryForFirestore);
+          recentlyAddedIds.add(docRef.id); // Add ID to set
+          setTimeout(() => recentlyAddedIds.delete(docRef.id), 5000); // Schedule removal
 
           await db.travelEntries.update(localId, { firestoreId: docRef.id });
+          set(state => ({
+            travelEntries: state.travelEntries.map(e => e.id === localId ? { ...e, firestoreId: docRef.id } : e)
+          }));
         } catch (firestoreError) {
-          console.error("Failed to sync travel entry to Firestore:", firestoreError);
+          console.error("Firestore sync failed:", firestoreError);
+          showToast('Entry saved locally, but failed to sync.', 'error');
         }
       }
-
-      await get().loadTravelEntries();
+      return true;
     } catch (error) {
       console.error("Failed to create travel entry:", error);
-      useUIStore.getState().showToast('Failed to add travel entry', 'error');
-      throw error;
+      showToast('Failed to add travel entry', 'error');
+      return false;
     }
   },
 
   updateTravelEntry: async (id, updates) => {
     const user = getAuth().currentUser;
+    await db.travelEntries.update(id, updates);
+    set(state => ({ travelEntries: state.travelEntries.map(e => e.id === id ? { ...e, ...updates } : e) }));
 
-    try {
-      await db.travelEntries.update(id, updates);
-
+    if (user && firestoreDb && navigator.onLine) {
       const entry = await db.travelEntries.get(id);
-      if (entry?.firestoreId && user && firestoreDb) {
-        try {
-          await updateDoc(
-            doc(firestoreDb, 'users', user.uid, 'travelEntries', entry.firestoreId),
-            updates as any
-          );
-        } catch (firestoreError) {
-          console.error("Failed to sync travel entry update to Firestore:", firestoreError);
-        }
+      if (entry?.firestoreId) {
+        await updateDoc(doc(firestoreDb, 'users', user.uid, 'travelEntries', entry.firestoreId), updates as any);
       }
-
-      await get().loadTravelEntries();
-      useUIStore.getState().showToast('Travel entry updated successfully', 'success');
-    } catch (error) {
-      console.error("Failed to update travel entry:", error);
-      useUIStore.getState().showToast('Failed to update travel entry', 'error');
-      throw error;
     }
   },
 
   deleteTravelEntry: async (id) => {
     const user = getAuth().currentUser;
+    const entryToDelete = await db.travelEntries.get(id);
+    await db.travelEntries.delete(id);
+    set(state => ({ travelEntries: state.travelEntries.filter(e => e.id !== id) }));
 
-    try {
-      const entry = await db.travelEntries.get(id);
-      
-      await db.travelEntries.delete(id);
-
-      if (entry?.firestoreId && user && firestoreDb) {
-        try {
-          await deleteDoc(
-            doc(firestoreDb, 'users', user.uid, 'travelEntries', entry.firestoreId)
-          );
-        } catch (firestoreError) {
-          console.error("Failed to delete travel entry from Firestore:", firestoreError);
-        }
-      }
-
-      await get().loadTravelEntries();
-    } catch (error) {
-      console.error("Failed to delete travel entry:", error);
-      useUIStore.getState().showToast('Failed to delete travel entry', 'error');
-      throw error;
+    if (user && firestoreDb && navigator.onLine && entryToDelete?.firestoreId) {
+      await deleteDoc(doc(firestoreDb, 'users', user.uid, 'travelEntries', entryToDelete.firestoreId));
     }
-  },
-
-
-
-  subscribeToTravelEntries: () => {
-    const auth = getAuth();
-    const user = auth.currentUser;
-    if (!user || !firestoreDb) {
-      console.log("User not logged in or firestore not available. Skipping travel entries sync.");
-      return () => {};
-    }
-
-    if (unsubscribeFromFirestore) {
-      console.log("Travel entries sync already active.");
-      return () => {};
-    }
-
-    set({ isSyncing: true });
-    console.log("Starting Firestore travel entries sync...");
-
-    const travelEntriesCollection = query(collection(firestoreDb, 'users', user.uid, 'travelEntries'));
-
-    unsubscribeFromFirestore = onSnapshot(travelEntriesCollection, async (snapshot) => {
-      set({ isLoading: true });
-      const changes = snapshot.docChanges();
-
-      await db.transaction('rw', db.travelEntries, async () => {
-        for (const change of changes) {
-          const firestoreData = change.doc.data();
-          const firestoreId = change.doc.id;
-
-          const existingEntry = await db.travelEntries.where('firestoreId').equals(firestoreId).first();
-
-          switch (change.type) {
-            case 'added':
-              if (recentlyAddedIds.has(firestoreId)) {
-                break;
-              }
-              if (!existingEntry) {
-                await db.travelEntries.add({
-                  ...firestoreData,
-                  firestoreId,
-                } as TravelEntry);
-              }
-              break;
-            case 'modified':
-              if (existingEntry?.id) {
-                await db.travelEntries.update(existingEntry.id, {
-                  ...firestoreData,
-                  firestoreId,
-                });
-              }
-              break;
-            case 'removed':
-              if (existingEntry?.id) {
-                await db.travelEntries.delete(existingEntry.id);
-              }
-              break;
-          }
-        }
-      });
-
-      await get().loadTravelEntries();
-    }, (error) => {
-      console.error("Error with Firestore travel entries snapshot listener:", error);
-      set({ error: "Failed to sync travel entries.", isSyncing: false });
-    });
-
-    return () => {
-      if (unsubscribeFromFirestore) {
-        console.log("Stopping Firestore travel entries sync.");
-        unsubscribeFromFirestore();
-        unsubscribeFromFirestore = null;
-      }
-      set({ isSyncing: false });
-    };
   },
 
   reconcileTravelEntries: async () => {
     const user = getAuth().currentUser;
-    if (!user || !firestoreDb) {
-      console.log("User not logged in. Skipping travel entries reconciliation.");
-      return;
-    }
+    if (!user || !firestoreDb) return;
 
-    try {
-      const entriesWithoutFirestoreId = await db.travelEntries
-        .filter(entry => !entry.firestoreId)
-        .toArray();
+    const unsynced = await db.travelEntries.filter(e => !e.firestoreId).toArray();
+    if (unsynced.length === 0) return;
 
-      console.log(`Reconciling ${entriesWithoutFirestoreId.length} travel entries...`);
+    console.log(`Reconciling ${unsynced.length} travel entries...`);
+    for (const entry of unsynced) {
+      try {
+        const project = await db.projects.get(entry.projectId as number);
+        const entryForFirestore = { ...entry, projectId: project?.firestoreId };
+        delete (entryForFirestore as any).id;
 
-      for (const entry of entriesWithoutFirestoreId) {
-        try {
-          const docRef = await addDoc(
-            collection(firestoreDb, 'users', user.uid, 'travelEntries'),
-            {
-              projectId: entry.projectId,
-              customerId: entry.customerId,
-              customerFirestoreId: entry.customerFirestoreId,
-              date: entry.date,
-              distance: entry.distance,
-              unit: entry.unit,
-              note: entry.note,
-              createdAt: entry.createdAt,
-              userId: entry.userId,
-              organizationId: entry.organizationId,
-            }
-          );
-          // Update local entry with the new Firestore ID
-          if (entry.id) {
+        const docRef = await addDoc(collection(firestoreDb, 'users', user.uid, 'travelEntries'), entryForFirestore);
+        recentlyAddedIds.add(docRef.id); // Add ID to set
+        setTimeout(() => recentlyAddedIds.delete(docRef.id), 5000); // Schedule removal
+        if (entry.id) {
             await db.travelEntries.update(entry.id, { firestoreId: docRef.id });
-          }
-        } catch (firestoreError) {
-          console.error(`Failed to reconcile travel entry ${entry.id}:`, firestoreError);
         }
+      } catch (error) {
+        console.error(`Failed to reconcile entry ${entry.id}:`, error);
       }
-    } catch (error) {
-      console.error("Error during travel entry reconciliation:", error);
     }
   },
 }));
