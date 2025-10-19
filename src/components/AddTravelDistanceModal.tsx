@@ -64,8 +64,8 @@ export function AddTravelDistanceModal() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.projectId || !currentProject) {
-      showToast('Please select a project', 'error');
+    if (!currentProject?.firestoreId) {
+      showToast('Please select a synced project', 'error');
       return;
     }
 
@@ -76,19 +76,9 @@ export function AddTravelDistanceModal() {
 
     try {
       const dateTimestamp = dayjs(formData.date).startOf('day').valueOf();
-      const customerId = selectedCustomer?.firestoreId || selectedCustomer?.id;
-
-      if (!customerId) {
-        showToast('Could not determine customer for this project', 'error');
-        return;
-      }
 
       const success = await createTravelEntry({
-        // Use the firestoreId if available, otherwise fall back to the local ID.
-        // The store logic will handle resolving this to the correct local project ID.
-        projectId: currentProject.firestoreId || currentProject.id!,
-        customerId: customerId,
-        customerFirestoreId: currentProject.customerFirestoreId,
+        projectId: currentProject.firestoreId,
         date: dateTimestamp,
         distance: parseFloat(formData.distance),
         unit,

@@ -80,18 +80,17 @@ export interface PredefinedNote {
 }
 
 export interface TravelEntry {
-  id?: number
-  projectId: number | string
-  customerId: number | string
-  customerFirestoreId?: string
-  date: number
-  distance: number
-  unit: 'km' | 'miles'
-  note?: string
-  createdAt: number
-  firestoreId?: string
-  userId?: string
-  organizationId?: string
+  id?: number;
+  projectId: string; // Should always be the firestoreId of the project
+  customerFirestoreId?: string; // The firestoreId of the customer
+  date: number;
+  distance: number;
+  unit: 'km' | 'miles';
+  note?: string;
+  createdAt: number;
+  firestoreId?: string;
+  userId?: string;
+  organizationId?: string;
 }
 
 // New: Organization and CorporateInfo types
@@ -138,6 +137,38 @@ export class BuzTrackerDB extends Dexie {
 
   constructor() {
     super('BuzTrackerDB')
+
+    // Version 619: Standardize TravelEntry to use firestoreId for relations and add index
+    this.version(619).stores({
+      projects: '++id, firestoreId, name, createdAt, archived, customerId, customerFirestoreId',
+      sessions: '++id, projectId, firestoreId, start, stop, createdAt, *note, [projectId+start]',
+      settings: '++id',
+      runningSession: '++id, running, projectId, startTs, isPaused, continuedFromSessionId',
+      predefinedNotes: '++id, firestoreId, note, createdAt',
+      customers: '++id, firestoreId, companyName, createdAt, archived',
+      organizations: '++id, firestoreId, createdBy, createdAt, updatedAt',
+      users: '++id, userId, organizationId, role, updatedAt',
+      travelEntries: '++id, firestoreId, projectId, customerFirestoreId, date, createdAt, [projectId+date+distance]'
+    }).upgrade(async (tx) => {
+      const projects = await tx.table('projects').toArray();
+      const projectsByLocalId = new Map(projects.map(p => [p.id, p]));
+
+      return tx.table('travelEntries').toCollection().modify(entry => {
+        // Check if projectId is a number (the old format)
+        if (typeof entry.projectId === 'number') {
+          const project = projectsByLocalId.get(entry.projectId);
+          if (project && project.firestoreId) {
+            // Convert to the new format
+            entry.projectId = project.firestoreId;
+            entry.customerFirestoreId = project.customerFirestoreId;
+          }
+        }
+        // Remove the old ambiguous field if it exists
+        if ('customerId' in entry) {
+          delete (entry as any).customerId;
+        }
+      });
+    });
 
     // Bump DB version to 617 to add compound index for sessions
     this.version(617).stores({

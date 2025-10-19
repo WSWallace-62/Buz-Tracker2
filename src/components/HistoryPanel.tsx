@@ -157,7 +157,7 @@ export function HistoryPanel() {
 
     // Filter out entries from archived projects and archived customers
     filtered = filtered.filter(t => {
-      const project = projects.find(p => p.id === t.projectId || p.firestoreId === t.projectId);
+      const project = projects.find(p => p.firestoreId === t.projectId);
 
       // Filter out archived projects
       if (project?.archived) return false;
@@ -166,9 +166,6 @@ export function HistoryPanel() {
       if (project?.customerFirestoreId) {
         const customer = customers.find(c => c.firestoreId === project.customerFirestoreId);
         if (customer?.archived) return false;
-      } else if (project?.customerId) {
-        const customer = customers.find(c => c.id === project.customerId);
-        if (customer?.archived) return false;
       }
 
       return true;
@@ -176,6 +173,8 @@ export function HistoryPanel() {
 
     if (selectedProjectIds.length > 0) {
       const projectIdsSet = new Set(selectedProjectIds);
+      // Note: selectedProjectIds can contain both number (local id) and string (firestoreId)
+      // We need to check against both possibilities for now.
       filtered = filtered.filter(t => projectIdsSet.has(t.projectId));
     }
 

@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useTravelEntriesStore } from '../store/travelEntries';
 import { useCustomersStore } from '../store/customers';
 import { useProjectsStore } from '../store/projects';
 import { useUIStore } from '../store/ui';
 import { TravelEntry } from '../db/dexie';
-import { formatDate } from '../utils/time';
+import dayjs from 'dayjs';
 
 interface EditTravelEntryModalProps {
   entry: TravelEntry;
@@ -18,14 +18,23 @@ const EditTravelEntryModal: React.FC<EditTravelEntryModalProps> = ({ entry, onCl
   const { showToast } = useUIStore();
 
   const [formData, setFormData] = useState({
-    date: formatDate(entry.date),
-    customerId: entry.customerId,
-    customerFirestoreId: entry.customerFirestoreId,
+    date: dayjs(entry.date).format('YYYY-MM-DD'),
     projectId: entry.projectId,
     distance: entry.distance,
     unit: entry.unit,
     note: entry.note || '',
   });
+
+  const [selectedCustomerFirestoreId, setSelectedCustomerFirestoreId] = useState<string | undefined>(entry.customerFirestoreId);
+
+  const availableProjects = useMemo(() => {
+    if (!selectedCustomerFirestoreId) {
+      // Show all non-archived projects if no customer is selected
+      return projects.filter(p => !p.archived);
+    }
+    // Filter projects by the selected customer
+    return projects.filter(p => !p.archived && p.customerFirestoreId === selectedCustomerFirestoreId);
+  }, [projects, selectedCustomerFirestoreId]);
 
   useEffect(() => {
     // Handle outside click to close
@@ -38,33 +47,40 @@ const EditTravelEntryModal: React.FC<EditTravelEntryModalProps> = ({ entry, onCl
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, [onClose]);
 
+  const handleCustomerChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newCustomerFirestoreId = e.target.value;
+    setSelectedCustomerFirestoreId(newCustomerFirestoreId);
+
+    // Find the first project for the newly selected customer and set it
+    const firstProject = projects.find(p => p.customerFirestoreId === newCustomerFirestoreId && !p.archived);
+    setFormData(prev => ({
+      ...prev,
+      projectId: firstProject?.firestoreId || '',
+    }));
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
-
-    if (name === 'customerId') {
-        const selectedCustomer = customers.find(c => c.id === Number(value));
-        if (selectedCustomer) {
-            setFormData(prev => ({
-                ...prev,
-                customerFirestoreId: selectedCustomer.firestoreId,
-                // Automatically select the first project associated with the customer
-                projectId: projects.find(p => p.customerId === selectedCustomer.id || p.customerFirestoreId === selectedCustomer.firestoreId)?.id || 0
-            }));
-        }
-    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!entry.id) return;
+    if (!entry.id || !formData.projectId) {
+      showToast('A project must be selected.', 'error');
+      return;
+    }
 
     try {
+      const project = projects.find(p => p.firestoreId === formData.projectId);
+
       await updateTravelEntry(entry.id, {
-        ...formData,
-        date: new Date(formData.date).getTime(),
+        date: dayjs(formData.date).startOf('day').valueOf(),
+        projectId: formData.projectId,
+        customerFirestoreId: project?.customerFirestoreId,
         distance: Number(formData.distance),
-        customerId: Number(formData.customerId),
+        unit: formData.unit as 'km' | 'miles',
+        note: formData.note,
       });
       showToast('Travel entry updated successfully', 'success');
       onClose();
@@ -82,8 +98,6 @@ const EditTravelEntryModal: React.FC<EditTravelEntryModalProps> = ({ entry, onCl
     }
   };
 
-  const availableProjects = projects.filter(p => !p.archived && (p.customerId === formData.customerId || p.customerFirestoreId === formData.customerFirestoreId));
-
   return (
     <div className="fixed inset-0 bg-black bg-opacity-25 dark:bg-opacity-50 flex items-center justify-center z-50 modal-backdrop" onKeyDown={handleKeyDown}>
       <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
@@ -95,14 +109,29 @@ const EditTravelEntryModal: React.FC<EditTravelEntryModalProps> = ({ entry, onCl
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Customer</label>
-            <select name="customerId" value={formData.customerId} onChange={handleChange} required className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-              {customers.filter(c => !c.archived).map(c => <option key={c.id} value={c.id}>{c.companyName}</option>)}
+            <select
+              name="customerFirestoreId"
+              value={selectedCustomerFirestoreId || ''}
+              onChange={handleCustomerChange}
+              required
+              className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="" disabled>Select a customer</option>
+              {customers.filter(c => !c.archived).map(c => <option key={c.firestoreId} value={c.firestoreId}>{c.companyName}</option>)}
             </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Project</label>
-            <select name="projectId" value={formData.projectId} onChange={handleChange} required className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-              {availableProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            <select
+              name="projectId"
+              value={formData.projectId}
+              onChange={handleChange}
+              required
+              disabled={!selectedCustomerFirestoreId}
+              className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-200 dark:disabled:bg-gray-600"
+            >
+              <option value="" disabled>Select a project</option>
+              {availableProjects.map(p => <option key={p.firestoreId} value={p.firestoreId}>{p.name}</option>)}
             </select>
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -114,7 +143,7 @@ const EditTravelEntryModal: React.FC<EditTravelEntryModalProps> = ({ entry, onCl
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Unit</label>
                 <select name="unit" value={formData.unit} onChange={handleChange} required className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <option value="km">km</option>
-                    <option value="mile">mile</option>
+                    <option value="miles">miles</option>
                 </select>
             </div>
           </div>

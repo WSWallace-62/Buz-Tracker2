@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { db, type TravelEntry, type Project } from '../db/dexie';
+import { db, type TravelEntry } from '../db/dexie';
 import { getAuth } from 'firebase/auth';
 import { useUIStore } from './ui';
 import {
@@ -11,13 +11,16 @@ import {
   onSnapshot,
   query,
   Unsubscribe,
+  writeBatch,
 } from 'firebase/firestore';
 import { db as firestoreDb } from '../firebase';
-import { useProjectsStore } from './projects';
 
 export type { TravelEntry };
 
 let unsubscribeFromFirestore: Unsubscribe | null = null;
+
+// This set will hold the firestoreId of documents that were just added locally
+// to prevent the onSnapshot listener from immediately re-adding them.
 const recentlyAddedIds = new Set<string>();
 
 interface TravelEntriesState {
@@ -43,7 +46,7 @@ export const useTravelEntriesStore = create<TravelEntriesState>((set, get) => ({
   startSync: () => {
     const user = getAuth().currentUser;
     if (!user || !firestoreDb) {
-      get().loadTravelEntries();
+      get().loadTravelEntries(); // Load local data if offline
       return;
     }
 
@@ -54,34 +57,59 @@ export const useTravelEntriesStore = create<TravelEntriesState>((set, get) => ({
 
     unsubscribeFromFirestore = onSnapshot(travelEntriesQuery, async (snapshot) => {
       const changes = snapshot.docChanges();
-      await db.transaction('rw', db.travelEntries, async () => {
-        const projects = useProjectsStore.getState().projects;
+      if (changes.length === 0) return;
 
+      await db.transaction('rw', db.travelEntries, async () => {
         for (const change of changes) {
-          const firestoreData = change.doc.data();
           const firestoreId = change.doc.id;
 
-          const firestoreProjectId = firestoreData.projectId;
-          let localProjectId = firestoreProjectId;
-
-          if (typeof firestoreProjectId === 'string') {
-            const project = projects.find(p => p.firestoreId === firestoreProjectId);
-            if (project?.id) {
-              localProjectId = project.id;
-            }
+          // If this ID was recently added locally, skip it to prevent echo.
+          if (recentlyAddedIds.has(firestoreId)) {
+            // The ID has been seen, so we can remove it from the set.
+            recentlyAddedIds.delete(firestoreId);
+            continue;
           }
 
-          const existingEntry = await db.travelEntries.where('firestoreId').equals(firestoreId).first();
+          const firestoreData = change.doc.data() as Omit<TravelEntry, 'id'>;
+          const existingEntryByFirestoreId = await db.travelEntries.where('firestoreId').equals(firestoreId).first();
 
-          if (change.type === 'added' && !recentlyAddedIds.has(firestoreId) && !existingEntry) {
-            await db.travelEntries.add({ ...firestoreData, projectId: localProjectId, firestoreId } as TravelEntry);
-          } else if (change.type === 'modified' && existingEntry?.id) {
-            await db.travelEntries.update(existingEntry.id, { ...firestoreData, projectId: localProjectId, firestoreId });
-          } else if (change.type === 'removed' && existingEntry?.id) {
-            await db.travelEntries.delete(existingEntry.id);
+          switch (change.type) {
+            case 'added': {
+              if (existingEntryByFirestoreId) continue; // Already synced.
+
+              // Check for a logical duplicate (created offline, not yet linked)
+              const logicalDuplicate = await db.travelEntries.where({
+                projectId: firestoreData.projectId,
+                date: firestoreData.date,
+                distance: firestoreData.distance,
+              }).filter(e => !e.firestoreId).first();
+
+              if (logicalDuplicate?.id) {
+                // Found an offline session. Link it instead of creating a new one.
+                await db.travelEntries.update(logicalDuplicate.id, { firestoreId });
+              } else {
+                // Genuinely new session from another client, add it.
+                await db.travelEntries.add({ ...firestoreData, firestoreId });
+              }
+              break;
+            }
+            case 'modified': {
+              if (existingEntryByFirestoreId?.id) {
+                await db.travelEntries.update(existingEntryByFirestoreId.id, { ...firestoreData, firestoreId });
+              }
+              break;
+            }
+            case 'removed': {
+              if (existingEntryByFirestoreId?.id) {
+                await db.travelEntries.delete(existingEntryByFirestoreId.id);
+              }
+              break;
+            }
           }
         }
       });
+
+      // Refresh the local state from Dexie
       await get().loadTravelEntries();
     }, (error) => {
       console.error("Error with Firestore listener:", error);
@@ -99,19 +127,18 @@ export const useTravelEntriesStore = create<TravelEntriesState>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       let query = db.travelEntries.orderBy('date');
-      if (filters.startDate && filters.endDate) {
-        query = query.filter(e => e.date >= filters.startDate && e.date <= filters.endDate);
+      const anyFilters = filters as any;
+      if (anyFilters.startDate && anyFilters.endDate) {
+        query = query.filter(e => e.date >= anyFilters.startDate && e.date <= anyFilters.endDate);
       }
       let entries = await query.reverse().toArray();
-      if (filters.projectIds?.length) {
-        const idSet = new Set(filters.projectIds);
+      if (anyFilters.projectIds?.length) {
+        const idSet = new Set(anyFilters.projectIds);
         entries = entries.filter(e => idSet.has(e.projectId));
       }
-      if (filters.customerIds?.length) {
-        const customers = await db.customers.toArray();
-        const customerIdSet = new Set(filters.customerIds);
-        const firestoreIdSet = new Set(customers.filter(c => c.id && customerIdSet.has(c.id) && c.firestoreId).map(c => c.firestoreId!));
-        entries = entries.filter(e => (e.customerId != null && customerIdSet.has(e.customerId)) || (e.customerFirestoreId && firestoreIdSet.has(e.customerFirestoreId)));
+      if (anyFilters.customerIds?.length) {
+        const customerIdSet = new Set(anyFilters.customerIds);
+        entries = entries.filter(e => e.customerFirestoreId && customerIdSet.has(e.customerFirestoreId));
       }
       set({ travelEntries: entries, isLoading: false });
     } catch (e) {
@@ -125,52 +152,48 @@ export const useTravelEntriesStore = create<TravelEntriesState>((set, get) => ({
     const { showToast } = useUIStore.getState();
 
     try {
-      let project: Project | undefined;
-      if (typeof entryData.projectId === 'string') {
-        project = await db.projects.where('firestoreId').equals(entryData.projectId).first();
-      } else {
-        project = await db.projects.get(entryData.projectId);
-      }
-
+      const project = await db.projects.where('firestoreId').equals(entryData.projectId).first();
       if (!project) {
-        throw new Error(`Project with ID ${entryData.projectId} not found locally.`);
+        throw new Error(`Project with firestoreId ${entryData.projectId} not found locally.`);
       }
 
+      // 1. Create the full entry object for Dexie, but without the firestoreId yet.
       const newEntryForDexie: Omit<TravelEntry, 'id'> = {
         ...entryData,
-        projectId: project.id!,
-        customerId: project.customerId!,
         customerFirestoreId: project.customerFirestoreId,
         createdAt: Date.now(),
         userId: user?.uid,
       };
 
+      // 2. Save to Dexie first (optimistic update). This is our source of truth.
       const localId = await db.travelEntries.add(newEntryForDexie as TravelEntry);
-      const newEntryForState = { ...newEntryForDexie, id: localId } as TravelEntry;
-      set(state => ({
-        travelEntries: [newEntryForState, ...state.travelEntries].sort((a, b) => b.date - a.date)
-      }));
 
+      // 3. Immediately reload the UI from Dexie.
+      await get().loadTravelEntries();
+
+      // 4. Sync to Firestore in the background.
       if (user && firestoreDb && navigator.onLine) {
-        const entryForFirestore = { ...newEntryForDexie, projectId: project.firestoreId };
         try {
+          // Create a clean object for Firestore, excluding the local `id`.
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { id, ...entryForFirestore } = { ...newEntryForDexie, id: localId } as TravelEntry;
           const docRef = await addDoc(collection(firestoreDb, 'users', user.uid, 'travelEntries'), entryForFirestore);
-          recentlyAddedIds.add(docRef.id); // Add ID to set
-          setTimeout(() => recentlyAddedIds.delete(docRef.id), 5000); // Schedule removal
-
+          
+          // 5. Once synced, update the local record with the permanent firestoreId.
+          // The sync listener will now ignore this entry because it finds a match by firestoreId.
           await db.travelEntries.update(localId, { firestoreId: docRef.id });
-          set(state => ({
-            travelEntries: state.travelEntries.map(e => e.id === localId ? { ...e, firestoreId: docRef.id } : e)
-          }));
+
         } catch (firestoreError) {
           console.error("Firestore sync failed:", firestoreError);
           showToast('Entry saved locally, but failed to sync.', 'error');
+          // No need to do anything else; the entry is safe locally and will be reconciled later.
         }
       }
+      
       return true;
     } catch (error) {
       console.error("Failed to create travel entry:", error);
-      showToast('Failed to add travel entry', 'error');
+      showToast(`Failed to add travel entry: ${(error as Error).message}`, 'error');
       return false;
     }
   },
@@ -183,7 +206,9 @@ export const useTravelEntriesStore = create<TravelEntriesState>((set, get) => ({
     if (user && firestoreDb && navigator.onLine) {
       const entry = await db.travelEntries.get(id);
       if (entry?.firestoreId) {
-        await updateDoc(doc(firestoreDb, 'users', user.uid, 'travelEntries', entry.firestoreId), updates as any);
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { id: localId, ...entryForFirestore } = { ...entry, ...updates };
+        await updateDoc(doc(firestoreDb, 'users', user.uid, 'travelEntries', entry.firestoreId), entryForFirestore);
       }
     }
   },
@@ -201,27 +226,38 @@ export const useTravelEntriesStore = create<TravelEntriesState>((set, get) => ({
 
   reconcileTravelEntries: async () => {
     const user = getAuth().currentUser;
-    if (!user || !firestoreDb) return;
+    if (!user || !firestoreDb || !navigator.onLine) return;
 
     const unsynced = await db.travelEntries.filter(e => !e.firestoreId).toArray();
     if (unsynced.length === 0) return;
 
     console.log(`Reconciling ${unsynced.length} travel entries...`);
-    for (const entry of unsynced) {
-      try {
-        const project = await db.projects.get(entry.projectId as number);
-        const entryForFirestore = { ...entry, projectId: project?.firestoreId };
-        delete (entryForFirestore as any).id;
+    const batch = writeBatch(firestoreDb);
+    const updates: { localId: number, firestoreId: string }[] = [];
 
-        const docRef = await addDoc(collection(firestoreDb, 'users', user.uid, 'travelEntries'), entryForFirestore);
-        recentlyAddedIds.add(docRef.id); // Add ID to set
-        setTimeout(() => recentlyAddedIds.delete(docRef.id), 5000); // Schedule removal
-        if (entry.id) {
-            await db.travelEntries.update(entry.id, { firestoreId: docRef.id });
-        }
-      } catch (error) {
-        console.error(`Failed to reconcile entry ${entry.id}:`, error);
+    for (const entry of unsynced) {
+      if (entry.id) {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { id, ...entryForFirestore } = entry;
+        const docRef = doc(collection(firestoreDb, 'users', user.uid, 'travelEntries'));
+        batch.set(docRef, entryForFirestore);
+        updates.push({ localId: entry.id, firestoreId: docRef.id });
       }
+    }
+
+    try {
+      await batch.commit();
+      // Now update local Dexie DB with the new firestoreIds
+      await db.transaction('rw', db.travelEntries, async () => {
+        for (const update of updates) {
+          await db.travelEntries.update(update.localId, { firestoreId: update.firestoreId });
+        }
+      });
+      console.log('Reconciliation complete.');
+      // Refresh data
+      await get().loadTravelEntries();
+    } catch (error) {
+      console.error('Failed to reconcile travel entries:', error);
     }
   },
 }));
