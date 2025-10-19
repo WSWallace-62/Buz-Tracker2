@@ -139,6 +139,19 @@ export class BuzTrackerDB extends Dexie {
   constructor() {
     super('BuzTrackerDB')
 
+    // Bump DB version to 617 to add compound index for sessions
+    this.version(617).stores({
+      projects: '++id, firestoreId, name, createdAt, archived, customerId, customerFirestoreId',
+      sessions: '++id, projectId, firestoreId, start, stop, createdAt, *note, [projectId+start]',
+      settings: '++id',
+      runningSession: '++id, running, projectId, startTs, isPaused, continuedFromSessionId',
+      predefinedNotes: '++id, firestoreId, note, createdAt',
+      customers: '++id, firestoreId, companyName, createdAt, archived',
+      organizations: '++id, firestoreId, createdBy, createdAt, updatedAt',
+      users: '++id, userId, organizationId, role, updatedAt',
+      travelEntries: '++id, firestoreId, projectId, customerId, customerFirestoreId, date, createdAt'
+    })
+
     // Bump DB version to 616 to add travelEntries table
     this.version(616).stores({
       projects: '++id, firestoreId, name, createdAt, archived, customerId, customerFirestoreId',
